@@ -1,5 +1,7 @@
 import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
+export * from '../ledger/infrastructure/persistence/accounts.schema';
+
 export const appMeta = pgTable('app_meta', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),

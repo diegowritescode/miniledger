@@ -8,6 +8,20 @@
       "when": 1783998866850,
       "tag": "0000_solid_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784007273046,
+      "tag": "0001_round_dexter_bennett",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784007281115,
+      "tag": "0002_seed_world_accounts",
+      "breakpoints": true
     }
   ]
 }
