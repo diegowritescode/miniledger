@@ -1,4 +1,5 @@
-import { Body, Controller, Headers, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { AccessTokenGuard } from '../../access/access-token.guard';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import {
@@ -19,6 +20,7 @@ const PROBLEMS: Record<TransferError, { status: number; title: string }> = {
 };
 
 @Controller('transfers')
+@UseGuards(AccessTokenGuard)
 export class TransfersController {
   constructor(private readonly transfers: TransferService) {}
 

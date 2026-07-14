@@ -1,4 +1,5 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { AccessTokenGuard } from '../../access/access-token.guard';
 import { ProblemException } from '../../shared/http/problem-details';
 import { AuditService } from '../application/audit.service';
 
@@ -18,6 +19,7 @@ interface ConservationResponse {
 }
 
 @Controller('audit')
+@UseGuards(AccessTokenGuard)
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
