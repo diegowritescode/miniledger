@@ -5,6 +5,10 @@ import { UNIT_OF_WORK, type UnitOfWork } from '../../shared/persistence/unit-of-
 import { err, ok, type Result } from '../../shared/result';
 import { Account } from '../domain/account';
 import { AccountId } from '../domain/account-id';
+import {
+  ACCOUNT_BALANCES_REPOSITORY,
+  type AccountBalancesRepository,
+} from '../domain/ports/account-balances-repository';
 import { ACCOUNTS_REPOSITORY, type AccountsRepository } from '../domain/ports/accounts-repository';
 
 export type OpenAccountError = 'unknown_currency';
@@ -17,6 +21,7 @@ export interface OpenAccountInput {
 export class AccountsService {
   constructor(
     @Inject(ACCOUNTS_REPOSITORY) private readonly accounts: AccountsRepository,
+    @Inject(ACCOUNT_BALANCES_REPOSITORY) private readonly balances: AccountBalancesRepository,
     @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
@@ -26,7 +31,10 @@ export class AccountsService {
     if (!currency.ok) return err('unknown_currency');
 
     const account = Account.openUser(currency.value, this.clock.now());
-    await this.uow.withTransaction((tx) => this.accounts.save(account, tx));
+    await this.uow.withTransaction(async (tx) => {
+      await this.accounts.save(account, tx);
+      await this.balances.initialize(account.id, tx);
+    });
 
     return ok(account);
   }

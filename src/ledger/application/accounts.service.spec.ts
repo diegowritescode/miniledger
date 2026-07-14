@@ -3,6 +3,7 @@ import { Currency } from '../../shared/kernel/currency';
 import { type Tx, type UnitOfWork } from '../../shared/persistence/unit-of-work';
 import { Account } from '../domain/account';
 import { AccountId } from '../domain/account-id';
+import { type AccountBalancesRepository } from '../domain/ports/account-balances-repository';
 import { type AccountsRepository } from '../domain/ports/accounts-repository';
 import { AccountsService } from './accounts.service';
 
@@ -36,6 +37,19 @@ const buildRepo = (
   return { repository, save, findById, list };
 };
 
+interface BalancesMocks {
+  readonly repository: AccountBalancesRepository;
+  readonly initialize: jest.Mock<Promise<void>, [AccountId, Tx?]>;
+}
+
+const buildBalances = (): BalancesMocks => {
+  const initialize = jest.fn<Promise<void>, [AccountId, Tx?]>().mockResolvedValue();
+  const find = jest.fn<Promise<bigint | null>, [AccountId, Tx?]>().mockResolvedValue(null);
+  const updateBalance = jest.fn<Promise<void>, [AccountId, bigint, Tx?]>().mockResolvedValue();
+  const repository: AccountBalancesRepository = { initialize, find, updateBalance };
+  return { repository, initialize };
+};
+
 const passthroughUow: UnitOfWork = {
   withTransaction: (work) => work({ executor: {} }),
 };
@@ -44,7 +58,8 @@ describe('AccountsService', () => {
   describe('open', () => {
     it('opens a user account and persists it inside a transaction', async () => {
       const { repository, save } = buildRepo();
-      const service = new AccountsService(repository, passthroughUow, clock);
+      const balances = buildBalances();
+      const service = new AccountsService(repository, balances.repository, passthroughUow, clock);
 
       const result = await service.open({ currency: 'USD' });
 
@@ -59,9 +74,27 @@ describe('AccountsService', () => {
       expect(tx).toBeDefined();
     });
 
+    it('initializes the balance row once, in the same transaction as the account', async () => {
+      const { repository, save } = buildRepo();
+      const balances = buildBalances();
+      const service = new AccountsService(repository, balances.repository, passthroughUow, clock);
+
+      const result = await service.open({ currency: 'USD' });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(balances.initialize).toHaveBeenCalledTimes(1);
+      const [accountId, initTx] = balances.initialize.mock.calls[0] ?? [];
+      const [savedAccount, saveTx] = save.mock.calls[0] ?? [];
+      expect(accountId?.value).toBe(result.value.id.value);
+      expect(savedAccount).toBeDefined();
+      expect(initTx).toBe(saveTx);
+    });
+
     it('rejects an unknown currency without touching the repository', async () => {
       const { repository, save } = buildRepo();
-      const service = new AccountsService(repository, passthroughUow, clock);
+      const balances = buildBalances();
+      const service = new AccountsService(repository, balances.repository, passthroughUow, clock);
 
       const result = await service.open({ currency: 'ZZZ' });
 
@@ -69,6 +102,7 @@ describe('AccountsService', () => {
       if (result.ok) return;
       expect(result.error).toBe('unknown_currency');
       expect(save).not.toHaveBeenCalled();
+      expect(balances.initialize).not.toHaveBeenCalled();
     });
   });
 
@@ -78,7 +112,12 @@ describe('AccountsService', () => {
       const { repository, findById } = buildRepo({
         findById: jest.fn<Promise<Account | null>, [AccountId, Tx?]>().mockResolvedValue(account),
       });
-      const service = new AccountsService(repository, passthroughUow, clock);
+      const service = new AccountsService(
+        repository,
+        buildBalances().repository,
+        passthroughUow,
+        clock,
+      );
 
       const found = await service.getById(account.id.value);
 
@@ -89,7 +128,12 @@ describe('AccountsService', () => {
 
     it('returns null when no account matches', async () => {
       const { repository } = buildRepo();
-      const service = new AccountsService(repository, passthroughUow, clock);
+      const service = new AccountsService(
+        repository,
+        buildBalances().repository,
+        passthroughUow,
+        clock,
+      );
 
       expect(await service.getById(AccountId.generate().value)).toBeNull();
     });
@@ -101,7 +145,12 @@ describe('AccountsService', () => {
       const { repository } = buildRepo({
         list: jest.fn<Promise<Account[]>, [Tx?]>().mockResolvedValue(accounts),
       });
-      const service = new AccountsService(repository, passthroughUow, clock);
+      const service = new AccountsService(
+        repository,
+        buildBalances().repository,
+        passthroughUow,
+        clock,
+      );
 
       expect(await service.list()).toBe(accounts);
     });
