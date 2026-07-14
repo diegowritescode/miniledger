@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AccessModule } from '../access/access.module';
 import { DB, type Database } from '../db/db.module';
 import { CLOCK } from '../shared/kernel/clock';
 import { SystemClock } from '../shared/kernel/system-clock';
@@ -20,6 +21,7 @@ import { AuditController } from './interface/audit.controller';
 import { TransfersController } from './interface/transfers.controller';
 
 @Module({
+  imports: [AccessModule],
   controllers: [AccountsController, TransfersController, AuditController],
   providers: [
     AccountsService,
