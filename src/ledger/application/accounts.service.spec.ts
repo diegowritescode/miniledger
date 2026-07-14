@@ -46,7 +46,10 @@ const buildBalances = (): BalancesMocks => {
   const initialize = jest.fn<Promise<void>, [AccountId, Tx?]>().mockResolvedValue();
   const find = jest.fn<Promise<bigint | null>, [AccountId, Tx?]>().mockResolvedValue(null);
   const updateBalance = jest.fn<Promise<void>, [AccountId, bigint, Tx?]>().mockResolvedValue();
-  const repository: AccountBalancesRepository = { initialize, find, updateBalance };
+  const lockForUpdate = jest
+    .fn<Promise<Map<string, bigint>>, [readonly AccountId[], Tx]>()
+    .mockResolvedValue(new Map());
+  const repository: AccountBalancesRepository = { initialize, find, updateBalance, lockForUpdate };
   return { repository, initialize };
 };
 
