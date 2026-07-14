@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { accounts } from './accounts.schema';
 
 export const accountBalances = pgTable('account_balances', {
@@ -9,5 +9,6 @@ export const accountBalances = pgTable('account_balances', {
   balance: bigint('balance', { mode: 'bigint' })
     .notNull()
     .default(sql`0`),
+  chainHash: text('chain_hash'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

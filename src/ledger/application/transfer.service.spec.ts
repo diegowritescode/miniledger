@@ -71,11 +71,14 @@ const build = (accounts: Account[], locked: Map<string, bigint>, options: Option
   const journals = { append } as unknown as JournalTransactionsRepository;
 
   const updateBalance = jest.fn<Promise<void>, unknown[]>().mockResolvedValue();
+  const lockedState = new Map(
+    [...locked].map(([id, balance]) => [id, { balance, chainHash: null }] as const),
+  );
   const balances: AccountBalancesRepository = {
     initialize: jest.fn(),
     find: jest.fn(),
     updateBalance,
-    lockForUpdate: jest.fn().mockResolvedValue(locked),
+    lockForUpdate: jest.fn().mockResolvedValue(lockedState),
   };
 
   const claim =
@@ -119,11 +122,13 @@ describe('TransferService', () => {
     expect(updateBalance).toHaveBeenCalledWith(
       expect.objectContaining({ value: from.value }),
       900n,
+      expect.any(String),
       expect.anything(),
     );
     expect(updateBalance).toHaveBeenCalledWith(
       expect.objectContaining({ value: to.value }),
       100n,
+      expect.any(String),
       expect.anything(),
     );
   });

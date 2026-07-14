@@ -43,6 +43,13 @@
       "when": 1784013744368,
       "tag": "0005_colossal_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784015026194,
+      "tag": "0006_sour_zaran",
+      "breakpoints": true
     }
   ]
 }

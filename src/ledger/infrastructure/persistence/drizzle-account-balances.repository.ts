@@ -2,7 +2,10 @@ import { eq, sql } from 'drizzle-orm';
 import { type Database } from '../../../db/db.module';
 import { type Tx } from '../../../shared/persistence/unit-of-work';
 import { type AccountId } from '../../domain/account-id';
-import { type AccountBalancesRepository } from '../../domain/ports/account-balances-repository';
+import {
+  type AccountBalancesRepository,
+  type LockedBalance,
+} from '../../domain/ports/account-balances-repository';
 import { accountBalances } from './account-balances.schema';
 
 export class DrizzleAccountBalancesRepository implements AccountBalancesRepository {
@@ -28,25 +31,33 @@ export class DrizzleAccountBalancesRepository implements AccountBalancesReposito
     return row ? row.balance : null;
   }
 
-  async updateBalance(accountId: AccountId, balance: bigint, tx?: Tx): Promise<void> {
+  async updateBalance(
+    accountId: AccountId,
+    balance: bigint,
+    chainHash: string | null,
+    tx?: Tx,
+  ): Promise<void> {
     await this.executor(tx)
       .update(accountBalances)
-      .set({ balance, updatedAt: sql`now()` })
+      .set({ balance, chainHash, updatedAt: sql`now()` })
       .where(eq(accountBalances.accountId, accountId.value));
   }
 
-  async lockForUpdate(accountIds: readonly AccountId[], tx: Tx): Promise<Map<string, bigint>> {
+  async lockForUpdate(
+    accountIds: readonly AccountId[],
+    tx: Tx,
+  ): Promise<Map<string, LockedBalance>> {
     const ordered = [...new Set(accountIds.map((id) => id.value))].sort();
-    const balances = new Map<string, bigint>();
+    const balances = new Map<string, LockedBalance>();
     for (const id of ordered) {
       const rows = await this.executor(tx)
-        .select({ balance: accountBalances.balance })
+        .select({ balance: accountBalances.balance, chainHash: accountBalances.chainHash })
         .from(accountBalances)
         .where(eq(accountBalances.accountId, id))
         .for('update');
       const row = rows[0];
       if (!row) throw new Error(`account ${id} has no balance row to lock`);
-      balances.set(id, row.balance);
+      balances.set(id, { balance: row.balance, chainHash: row.chainHash });
     }
     return balances;
   }
