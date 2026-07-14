@@ -4,6 +4,10 @@ import { Account } from '../domain/account';
 import { AccountId } from '../domain/account-id';
 import { type AccountBalancesRepository } from '../domain/ports/account-balances-repository';
 import { type AccountsRepository } from '../domain/ports/accounts-repository';
+import {
+  type IdempotencyClaim,
+  type IdempotencyRepository,
+} from '../domain/ports/idempotency-repository';
 import { type JournalTransactionsRepository } from '../domain/ports/journal-transactions-repository';
 import { TransferService } from './transfer.service';
 
@@ -39,13 +43,19 @@ const passthroughUow: UnitOfWork = {
   withTransaction: (work) => work({ executor: {} }),
 };
 
+interface Options {
+  claim?: jest.Mock<Promise<IdempotencyClaim>, [string, string, Tx]>;
+}
+
 interface Mocks {
   service: TransferService;
   append: jest.Mock;
   updateBalance: jest.Mock;
+  claim: jest.Mock<Promise<IdempotencyClaim>, [string, string, Tx]>;
+  complete: jest.Mock;
 }
 
-const build = (accounts: Account[], locked: Map<string, bigint>): Mocks => {
+const build = (accounts: Account[], locked: Map<string, bigint>, options: Options = {}): Mocks => {
   const byId = new Map(accounts.map((account) => [account.id.value, account]));
   const findById = jest
     .fn<Promise<Account | null>, [AccountId, Tx?]>()
@@ -68,10 +78,18 @@ const build = (accounts: Account[], locked: Map<string, bigint>): Mocks => {
     lockForUpdate: jest.fn().mockResolvedValue(locked),
   };
 
+  const claim =
+    options.claim ??
+    jest.fn<Promise<IdempotencyClaim>, [string, string, Tx]>().mockResolvedValue({ owned: true });
+  const complete = jest.fn<Promise<void>, unknown[]>().mockResolvedValue();
+  const idempotency: IdempotencyRepository = { claim, complete };
+
   return {
-    service: new TransferService(accountsRepo, balances, journals, passthroughUow),
+    service: new TransferService(accountsRepo, balances, journals, idempotency, passthroughUow),
     append,
     updateBalance,
+    claim,
+    complete,
   };
 };
 
@@ -96,7 +114,7 @@ describe('TransferService', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.balanceAfter).toEqual([900n, 100n]);
+    expect(result.value.postings.map((posting) => posting.balanceAfter)).toEqual(['900', '100']);
     expect(append).toHaveBeenCalledTimes(1);
     expect(updateBalance).toHaveBeenCalledWith(
       expect.objectContaining({ value: from.value }),
@@ -130,7 +148,7 @@ describe('TransferService', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.balanceAfter).toEqual([-500n, 500n]);
+    expect(result.value.postings.map((posting) => posting.balanceAfter)).toEqual(['-500', '500']);
     expect(append).toHaveBeenCalledTimes(1);
   });
 
@@ -199,13 +217,11 @@ describe('TransferService', () => {
   });
 
   it('rejects an unknown currency', async () => {
-    const from = AccountId.generate();
-    const to = AccountId.generate();
     const { service } = build([], new Map());
 
     const result = await service.transfer({
-      from: from.value,
-      to: to.value,
+      from: AccountId.generate().value,
+      to: AccountId.generate().value,
       amount: '100',
       currency: 'ZZZ',
     });
@@ -216,13 +232,11 @@ describe('TransferService', () => {
   });
 
   it('rejects a non-positive amount', async () => {
-    const from = AccountId.generate();
-    const to = AccountId.generate();
     const { service } = build([], new Map());
 
     const result = await service.transfer({
-      from: from.value,
-      to: to.value,
+      from: AccountId.generate().value,
+      to: AccountId.generate().value,
       amount: '0',
       currency: 'USD',
     });
@@ -246,5 +260,98 @@ describe('TransferService', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('same_account');
+  });
+
+  describe('idempotency', () => {
+    it('executes and records the response when the key is unclaimed', async () => {
+      const from = AccountId.generate();
+      const to = AccountId.generate();
+      const { service, append, complete } = build(
+        [userAccount(from), userAccount(to)],
+        new Map([
+          [from.value, 1000n],
+          [to.value, 0n],
+        ]),
+        { claim: jest.fn().mockResolvedValue({ owned: true }) },
+      );
+
+      const result = await service.transfer({
+        from: from.value,
+        to: to.value,
+        amount: '100',
+        currency: 'USD',
+        idempotencyKey: 'key-1',
+      });
+
+      expect(result.ok).toBe(true);
+      expect(append).toHaveBeenCalledTimes(1);
+      expect(complete).toHaveBeenCalledTimes(1);
+    });
+
+    it('replays the stored response for a duplicate key without re-executing', async () => {
+      const from = AccountId.generate();
+      const to = AccountId.generate();
+      const stored = { id: 'stored', currency: 'USD', postings: [] };
+      const { service, append, complete } = build(
+        [userAccount(from), userAccount(to)],
+        new Map([
+          [from.value, 1000n],
+          [to.value, 0n],
+        ]),
+        {
+          claim: jest
+            .fn<Promise<IdempotencyClaim>, [string, string, Tx]>()
+            .mockImplementation((_key, fingerprint) =>
+              Promise.resolve({ owned: false, fingerprint, response: stored }),
+            ),
+        },
+      );
+
+      const result = await service.transfer({
+        from: from.value,
+        to: to.value,
+        amount: '100',
+        currency: 'USD',
+        idempotencyKey: 'key-1',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toEqual(stored);
+      expect(append).not.toHaveBeenCalled();
+      expect(complete).not.toHaveBeenCalled();
+    });
+
+    it('rejects a key reused for a different request', async () => {
+      const from = AccountId.generate();
+      const to = AccountId.generate();
+      const { service, append } = build(
+        [userAccount(from), userAccount(to)],
+        new Map([
+          [from.value, 1000n],
+          [to.value, 0n],
+        ]),
+        {
+          claim: jest.fn<Promise<IdempotencyClaim>, [string, string, Tx]>().mockResolvedValue({
+            owned: false,
+            fingerprint: 'a-different-fingerprint',
+            response: {},
+          }),
+        },
+      );
+
+      const result = await service.transfer({
+        from: from.value,
+        to: to.value,
+        amount: '100',
+        currency: 'USD',
+        idempotencyKey: 'key-1',
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error).toBe('idempotency_conflict');
+      expect(append).not.toHaveBeenCalled();
+    });
   });
 });

@@ -36,6 +36,13 @@
       "when": 1784010548530,
       "tag": "0004_ledger_invariants",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784013744368,
+      "tag": "0005_colossal_whizzer",
+      "breakpoints": true
     }
   ]
 }

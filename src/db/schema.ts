@@ -3,6 +3,7 @@ import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 export * from '../ledger/infrastructure/persistence/accounts.schema';
 export * from '../ledger/infrastructure/persistence/journal-transactions.schema';
 export * from '../ledger/infrastructure/persistence/account-balances.schema';
+export * from '../ledger/infrastructure/persistence/idempotency.schema';
 
 export const appMeta = pgTable('app_meta', {
   key: text('key').primaryKey(),

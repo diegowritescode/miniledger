@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -112,6 +113,59 @@ describe('Transfers (e2e)', () => {
         currency: 'USD',
       })
       .expect(404)
+      .expect('Content-Type', /application\/problem\+json/);
+  });
+
+  it('replays a retried transfer that carries the same Idempotency-Key', async () => {
+    const world = await worldUsdId();
+    const a = await openAccount();
+    const b = await openAccount();
+    await request(app.getHttpServer())
+      .post('/transfers')
+      .send({ from: world, to: a, amount: '1000', currency: 'USD' })
+      .expect(201);
+
+    const idempotencyKey = randomUUID();
+    const body = { from: a, to: b, amount: '200', currency: 'USD' };
+
+    const first = await request(app.getHttpServer())
+      .post('/transfers')
+      .set('Idempotency-Key', idempotencyKey)
+      .send(body)
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post('/transfers')
+      .set('Idempotency-Key', idempotencyKey)
+      .send(body)
+      .expect(201);
+
+    const firstBody = first.body as TransferResponse;
+    const secondBody = second.body as TransferResponse;
+    expect(secondBody.id).toBe(firstBody.id);
+    expect(secondBody.postings).toEqual(firstBody.postings);
+  });
+
+  it('rejects the same Idempotency-Key with a different body with 409', async () => {
+    const world = await worldUsdId();
+    const a = await openAccount();
+    const b = await openAccount();
+    await request(app.getHttpServer())
+      .post('/transfers')
+      .send({ from: world, to: a, amount: '1000', currency: 'USD' })
+      .expect(201);
+
+    const idempotencyKey = randomUUID();
+    await request(app.getHttpServer())
+      .post('/transfers')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ from: a, to: b, amount: '100', currency: 'USD' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/transfers')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({ from: a, to: b, amount: '500', currency: 'USD' })
+      .expect(409)
       .expect('Content-Type', /application\/problem\+json/);
   });
 });

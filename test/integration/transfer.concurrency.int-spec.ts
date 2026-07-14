@@ -6,6 +6,7 @@ import { Account } from '../../src/ledger/domain/account';
 import { type AccountId } from '../../src/ledger/domain/account-id';
 import { DrizzleAccountBalancesRepository } from '../../src/ledger/infrastructure/persistence/drizzle-account-balances.repository';
 import { DrizzleAccountsRepository } from '../../src/ledger/infrastructure/persistence/drizzle-accounts.repository';
+import { DrizzleIdempotencyRepository } from '../../src/ledger/infrastructure/persistence/drizzle-idempotency.repository';
 import { DrizzleJournalTransactionsRepository } from '../../src/ledger/infrastructure/persistence/drizzle-journal-transactions.repository';
 import { Currency } from '../../src/shared/kernel/currency';
 
@@ -24,8 +25,9 @@ describe('Transfer concurrency (integration)', () => {
   const accounts = new DrizzleAccountsRepository(db);
   const balances = new DrizzleAccountBalancesRepository(db);
   const journals = new DrizzleJournalTransactionsRepository(db);
+  const idempotency = new DrizzleIdempotencyRepository(db);
   const uow = new DrizzleUnitOfWork(db);
-  const service = new TransferService(accounts, balances, journals, uow);
+  const service = new TransferService(accounts, balances, journals, idempotency, uow);
 
   const createdAccountIds: string[] = [];
   let worldUsd: AccountId;

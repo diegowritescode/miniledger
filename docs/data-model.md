@@ -166,6 +166,26 @@ this row is a maintained projection of them.
   lock in the same transaction as the postings; that write path is part of the transfer slice
   ([ADR-006](adr/006-concurrency-safe-balances.md)).
 
+## Idempotency keys
+
+The **`idempotency_keys`** table makes a transfer exactly-once under retries and concurrent
+duplicates ([ADR-007](adr/007-idempotency.md)). The key is claimed **inside the transfer's
+transaction**, so the record and the postings/balances commit or roll back together.
+
+### `idempotency_keys`
+
+| Column           | Type          | Null | Default | Notes                                                            |
+| ---------------- | ------------- | ---- | ------- | ---------------------------------------------------------------- |
+| `key`            | `text`        | no   | —       | Primary key; the client-supplied `Idempotency-Key`.              |
+| `fingerprint`    | `text`        | no   | —       | Hash of the request; a reuse with a different one is a `409`.    |
+| `transaction_id` | `uuid`        | yes  | —       | FK → `journal_transactions(id)`; the transfer this key produced. |
+| `response`       | `jsonb`       | yes  | —       | The stored receipt, replayed verbatim on a duplicate.            |
+| `created_at`     | `timestamptz` | no   | `now()` | When the key was claimed.                                        |
+
+The unique `key` is the serialization point: a concurrent duplicate's `INSERT … ON CONFLICT DO
+NOTHING` **blocks** on the owner's uncommitted row, then replays (owner committed) or takes over
+(owner rolled back). See [ADR-007](adr/007-idempotency.md).
+
 ## Migrations
 
 Schema evolves through generated, reviewable SQL migrations (`drizzle-kit generate`), applied in
@@ -178,6 +198,7 @@ every environment by the lean `drizzle-orm` runtime migrator ([ADR-003](adr/003-
 | `0002_seed_world_accounts`  | Seeds one `@world` system account per supported currency (USD/EUR/JPY).                                                         |
 | `0003_broad_rocket_raccoon` | `journal_transactions`, `postings` (FKs, indexes, `amount <> 0` check), and `account_balances` tables.                          |
 | `0004_ledger_invariants`    | Custom SQL: the deferred sum-zero constraint trigger, `REVOKE UPDATE, DELETE ON postings`, and the idempotent balance backfill. |
+| `0005_colossal_whizzer`     | `idempotency_keys` table (FK → `journal_transactions`).                                                                         |
 
 The `@world` seed is **idempotent** — each insert is guarded by
 `WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE handle = '@world' AND currency = …)` — so applying
