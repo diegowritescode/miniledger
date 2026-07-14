@@ -16,12 +16,24 @@ const currency = (code: string): Currency => {
 describe('DrizzleAccountsRepository (integration)', () => {
   const pool = new Pool({ connectionString: DATABASE_URL });
   const repository = new DrizzleAccountsRepository(drizzle(pool));
+  const createdAccountIds: string[] = [];
+
+  const persist = async (account: Account): Promise<Account> => {
+    await repository.save(account);
+    createdAccountIds.push(account.id.value);
+    return account;
+  };
 
   afterEach(async () => {
-    await pool.query(
-      "DELETE FROM account_balances WHERE account_id IN (SELECT id FROM accounts WHERE type = 'user')",
-    );
-    await pool.query("DELETE FROM accounts WHERE type = 'user'");
+    if (createdAccountIds.length === 0) return;
+    await pool.query('DELETE FROM postings WHERE account_id = ANY($1::uuid[])', [
+      createdAccountIds,
+    ]);
+    await pool.query('DELETE FROM account_balances WHERE account_id = ANY($1::uuid[])', [
+      createdAccountIds,
+    ]);
+    await pool.query('DELETE FROM accounts WHERE id = ANY($1::uuid[])', [createdAccountIds]);
+    createdAccountIds.length = 0;
   });
 
   afterAll(async () => {
@@ -29,9 +41,10 @@ describe('DrizzleAccountsRepository (integration)', () => {
   });
 
   it('saves a user account and reads back an equal aggregate', async () => {
-    const account = Account.openUser(currency('USD'), new Date('2026-04-04T10:00:00.000Z'));
+    const account = await persist(
+      Account.openUser(currency('USD'), new Date('2026-04-04T10:00:00.000Z')),
+    );
 
-    await repository.save(account);
     const found = await repository.findById(account.id);
 
     expect(found).not.toBeNull();
@@ -45,9 +58,8 @@ describe('DrizzleAccountsRepository (integration)', () => {
   });
 
   it('includes a saved account in the listing', async () => {
-    const account = Account.openUser(currency('EUR'), new Date());
+    const account = await persist(Account.openUser(currency('EUR'), new Date()));
 
-    await repository.save(account);
     const listed = await repository.list();
 
     expect(listed.some((candidate) => candidate.id.equals(account.id))).toBe(true);

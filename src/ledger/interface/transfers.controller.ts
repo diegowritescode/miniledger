@@ -1,24 +1,12 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, Post } from '@nestjs/common';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import {
   type TransferError,
+  type TransferReceipt,
   TransferService,
-  type TransferResult,
 } from '../application/transfer.service';
 import { transferSchema, type TransferDto } from './transfer.dto';
-
-interface PostingResponse {
-  accountId: string;
-  amount: string;
-  balanceAfter: string;
-}
-
-interface TransferResponse {
-  id: string;
-  currency: string;
-  postings: PostingResponse[];
-}
 
 const PROBLEMS: Record<TransferError, { status: number; title: string }> = {
   unknown_currency: { status: 422, title: 'Unknown currency' },
@@ -27,6 +15,7 @@ const PROBLEMS: Record<TransferError, { status: number; title: string }> = {
   unknown_account: { status: 404, title: 'Account not found' },
   account_currency_mismatch: { status: 422, title: 'Account currency does not match the transfer' },
   insufficient_funds: { status: 422, title: 'Insufficient funds' },
+  idempotency_conflict: { status: 409, title: 'Idempotency key reused for a different request' },
 };
 
 @Controller('transfers')
@@ -37,8 +26,12 @@ export class TransfersController {
   @HttpCode(201)
   async create(
     @Body(new ZodValidationPipe(transferSchema)) body: TransferDto,
-  ): Promise<TransferResponse> {
-    const result = await this.transfers.transfer(body);
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ): Promise<TransferReceipt> {
+    const result = await this.transfers.transfer({
+      ...body,
+      idempotencyKey: idempotencyKey || undefined,
+    });
     if (!result.ok) {
       const problem = PROBLEMS[result.error];
       throw new ProblemException({
@@ -48,18 +41,6 @@ export class TransfersController {
         detail: result.error,
       });
     }
-    return this.toResponse(result.value);
-  }
-
-  private toResponse(result: TransferResult): TransferResponse {
-    return {
-      id: result.transaction.id.value,
-      currency: result.transaction.currency.code,
-      postings: result.transaction.postings.map((posting, index) => ({
-        accountId: posting.accountId.value,
-        amount: posting.amount.amount.toString(),
-        balanceAfter: result.balanceAfter[index]!.toString(),
-      })),
-    };
+    return result.value;
   }
 }
