@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { AccessTokenGuard } from '../../access/access-token.guard';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AccountsService } from '../application/accounts.service';
@@ -14,6 +15,7 @@ interface AccountResponse {
 }
 
 @Controller('accounts')
+@UseGuards(AccessTokenGuard)
 export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}
 
