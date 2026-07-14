@@ -7,6 +7,7 @@ module.exports = {
     '**/*.ts',
     '!**/*.spec.ts',
     '!**/*.module.ts',
+    '!**/*.schema.ts',
     '!main.ts',
     '!load-env-file.ts',
     '!migrate.ts',

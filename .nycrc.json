@@ -6,6 +6,7 @@
     "**/*.spec.ts",
     "**/*.module.ts",
     "**/*.dto.ts",
+    "**/*.schema.ts",
     "src/main.ts",
     "src/migrate.ts",
     "src/load-env-file.ts",
