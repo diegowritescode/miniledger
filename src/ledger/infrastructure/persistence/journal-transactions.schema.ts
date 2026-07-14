@@ -12,6 +12,7 @@ export const postings = pgTable(
   'postings',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    seq: bigint('seq', { mode: 'number' }).generatedAlwaysAsIdentity(),
     transactionId: uuid('transaction_id')
       .notNull()
       .references(() => journalTransactions.id),
@@ -20,6 +21,8 @@ export const postings = pgTable(
       .references(() => accounts.id),
     amount: bigint('amount', { mode: 'bigint' }).notNull(),
     balanceAfter: bigint('balance_after', { mode: 'bigint' }).notNull(),
+    prevHash: text('prev_hash'),
+    hash: text('hash').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

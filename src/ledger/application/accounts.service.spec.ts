@@ -3,7 +3,10 @@ import { Currency } from '../../shared/kernel/currency';
 import { type Tx, type UnitOfWork } from '../../shared/persistence/unit-of-work';
 import { Account } from '../domain/account';
 import { AccountId } from '../domain/account-id';
-import { type AccountBalancesRepository } from '../domain/ports/account-balances-repository';
+import {
+  type AccountBalancesRepository,
+  type LockedBalance,
+} from '../domain/ports/account-balances-repository';
 import { type AccountsRepository } from '../domain/ports/accounts-repository';
 import { AccountsService } from './accounts.service';
 
@@ -45,9 +48,11 @@ interface BalancesMocks {
 const buildBalances = (): BalancesMocks => {
   const initialize = jest.fn<Promise<void>, [AccountId, Tx?]>().mockResolvedValue();
   const find = jest.fn<Promise<bigint | null>, [AccountId, Tx?]>().mockResolvedValue(null);
-  const updateBalance = jest.fn<Promise<void>, [AccountId, bigint, Tx?]>().mockResolvedValue();
+  const updateBalance = jest
+    .fn<Promise<void>, [AccountId, bigint, string | null, Tx?]>()
+    .mockResolvedValue();
   const lockForUpdate = jest
-    .fn<Promise<Map<string, bigint>>, [readonly AccountId[], Tx]>()
+    .fn<Promise<Map<string, LockedBalance>>, [readonly AccountId[], Tx]>()
     .mockResolvedValue(new Map());
   const repository: AccountBalancesRepository = { initialize, find, updateBalance, lockForUpdate };
   return { repository, initialize };

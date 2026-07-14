@@ -86,14 +86,17 @@ withdrawals, refunds, and reversals are the same primitive with different legs. 
 
 ### `postings`
 
-| Column           | Type          | Null | Default             | Notes                                                                                       |
-| ---------------- | ------------- | ---- | ------------------- | ------------------------------------------------------------------------------------------- |
-| `id`             | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                                                                |
-| `transaction_id` | `uuid`        | no   | —                   | FK → `journal_transactions(id)`. Indexed.                                                   |
-| `account_id`     | `uuid`        | no   | —                   | FK → `accounts(id)`. Indexed.                                                               |
-| `amount`         | `bigint`      | no   | —                   | Signed minor units ([ADR-004](adr/004-money-representation.md)); `< 0` debit, `> 0` credit. |
-| `balance_after`  | `bigint`      | no   | —                   | The account's balance immediately after this posting.                                       |
-| `created_at`     | `timestamptz` | no   | `now()`             | Creation instant.                                                                           |
+| Column           | Type          | Null | Default             | Notes                                                                                              |
+| ---------------- | ------------- | ---- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| `id`             | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                                                                       |
+| `transaction_id` | `uuid`        | no   | —                   | FK → `journal_transactions(id)`. Indexed.                                                          |
+| `account_id`     | `uuid`        | no   | —                   | FK → `accounts(id)`. Indexed.                                                                      |
+| `amount`         | `bigint`      | no   | —                   | Signed minor units ([ADR-004](adr/004-money-representation.md)); `< 0` debit, `> 0` credit.        |
+| `balance_after`  | `bigint`      | no   | —                   | The account's balance immediately after this posting.                                              |
+| `seq`            | `bigint`      | no   | identity            | Monotonic insertion order (the per-account chain order).                                           |
+| `prev_hash`      | `text`        | yes  | —                   | Previous chain head for this account (`NULL` at genesis) ([ADR-008](adr/008-audit-hash-chain.md)). |
+| `hash`           | `text`        | no   | —                   | `sha256(prev ‖ txId ‖ accountId ‖ amount ‖ balanceAfter)` — the account's chain link.              |
+| `created_at`     | `timestamptz` | no   | `now()`             | Creation instant.                                                                                  |
 
 Indexes on `transaction_id` and `account_id` support fetching a transaction's legs and an account's
 history. `amount` and `balance_after` are `bigint` in minor units, marshalled as JS `bigint` at the
@@ -147,11 +150,12 @@ this row is a maintained projection of them.
 
 ### `account_balances`
 
-| Column       | Type          | Null | Default | Notes                                                  |
-| ------------ | ------------- | ---- | ------- | ------------------------------------------------------ |
-| `account_id` | `uuid`        | no   | —       | Primary key; FK → `accounts(id)`. One row per account. |
-| `balance`    | `bigint`      | no   | `0`     | Current balance in minor units.                        |
-| `updated_at` | `timestamptz` | no   | `now()` | Last time the balance changed.                         |
+| Column       | Type          | Null | Default | Notes                                                                                                               |
+| ------------ | ------------- | ---- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| `account_id` | `uuid`        | no   | —       | Primary key; FK → `accounts(id)`. One row per account.                                                              |
+| `balance`    | `bigint`      | no   | `0`     | Current balance in minor units.                                                                                     |
+| `chain_hash` | `text`        | yes  | —       | Head of the account's posting hash chain ([ADR-008](adr/008-audit-hash-chain.md)); `NULL` before its first posting. |
+| `updated_at` | `timestamptz` | no   | `now()` | Last time the balance changed.                                                                                      |
 
 ### Balance-row lifecycle
 
@@ -191,14 +195,15 @@ NOTHING` **blocks** on the owner's uncommitted row, then replays (owner committe
 Schema evolves through generated, reviewable SQL migrations (`drizzle-kit generate`), applied in
 every environment by the lean `drizzle-orm` runtime migrator ([ADR-003](adr/003-persistence-and-orm.md)).
 
-| Migration                   | Purpose                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `0000_solid_cammi`          | `app_meta` bootstrap table.                                                                                                     |
-| `0001_round_dexter_bennett` | `accounts` table, the `type` check, and the partial unique index.                                                               |
-| `0002_seed_world_accounts`  | Seeds one `@world` system account per supported currency (USD/EUR/JPY).                                                         |
-| `0003_broad_rocket_raccoon` | `journal_transactions`, `postings` (FKs, indexes, `amount <> 0` check), and `account_balances` tables.                          |
-| `0004_ledger_invariants`    | Custom SQL: the deferred sum-zero constraint trigger, `REVOKE UPDATE, DELETE ON postings`, and the idempotent balance backfill. |
-| `0005_colossal_whizzer`     | `idempotency_keys` table (FK → `journal_transactions`).                                                                         |
+| Migration                   | Purpose                                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `0000_solid_cammi`          | `app_meta` bootstrap table.                                                                                                           |
+| `0001_round_dexter_bennett` | `accounts` table, the `type` check, and the partial unique index.                                                                     |
+| `0002_seed_world_accounts`  | Seeds one `@world` system account per supported currency (USD/EUR/JPY).                                                               |
+| `0003_broad_rocket_raccoon` | `journal_transactions`, `postings` (FKs, indexes, `amount <> 0` check), and `account_balances` tables.                                |
+| `0004_ledger_invariants`    | Custom SQL: the deferred sum-zero constraint trigger, `REVOKE UPDATE, DELETE ON postings`, and the idempotent balance backfill.       |
+| `0005_colossal_whizzer`     | `idempotency_keys` table (FK → `journal_transactions`).                                                                               |
+| `0006_sour_zaran`           | Per-account hash chain: `postings.seq`/`prev_hash`/`hash` and `account_balances.chain_hash` ([ADR-008](adr/008-audit-hash-chain.md)). |
 
 The `@world` seed is **idempotent** — each insert is guarded by
 `WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE handle = '@world' AND currency = …)` — so applying

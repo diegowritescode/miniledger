@@ -17,7 +17,9 @@ import {
 import {
   JOURNAL_TRANSACTIONS_REPOSITORY,
   type JournalTransactionsRepository,
+  type PostingLine,
 } from '../domain/ports/journal-transactions-repository';
+import { hashPosting } from '../domain/hash-chain';
 import { JournalTransaction } from '../domain/journal-transaction';
 import { isSufficient } from '../domain/overdraft';
 
@@ -135,22 +137,35 @@ export class TransferService {
 
     const locked = await this.balances.lockForUpdate(involved, tx);
     const running = new Map(locked);
-    const balanceAfter: bigint[] = [];
+    const lines: PostingLine[] = [];
     for (const posting of journal.postings) {
       const key = posting.accountId.value;
-      const current = running.get(key);
-      if (current === undefined) throw new TransferFailure('unknown_account');
-      if (!isSufficient(Money.of(current, currency), posting.amount, floors.get(key) ?? null)) {
+      const state = running.get(key);
+      if (state === undefined) throw new TransferFailure('unknown_account');
+      if (
+        !isSufficient(Money.of(state.balance, currency), posting.amount, floors.get(key) ?? null)
+      ) {
         throw new TransferFailure('insufficient_funds');
       }
-      const next = current + posting.amount.amount;
-      running.set(key, next);
-      balanceAfter.push(next);
+      const balanceAfter = state.balance + posting.amount.amount;
+      const hash = hashPosting(state.chainHash, {
+        transactionId: journal.id.value,
+        accountId: key,
+        amount: posting.amount.amount,
+        balanceAfter,
+      });
+      lines.push({ balanceAfter, prevHash: state.chainHash, hash });
+      running.set(key, { balance: balanceAfter, chainHash: hash });
     }
 
-    await this.journals.append(journal, balanceAfter, tx);
-    for (const [key, balance] of running) {
-      await this.balances.updateBalance(AccountId.fromString(key), balance, tx);
+    await this.journals.append(journal, lines, tx);
+    for (const [key, state] of running) {
+      await this.balances.updateBalance(
+        AccountId.fromString(key),
+        state.balance,
+        state.chainHash,
+        tx,
+      );
     }
 
     return {
@@ -159,7 +174,7 @@ export class TransferService {
       postings: journal.postings.map((posting, index) => ({
         accountId: posting.accountId.value,
         amount: posting.amount.amount.toString(),
-        balanceAfter: balanceAfter[index]!.toString(),
+        balanceAfter: lines[index]!.balanceAfter.toString(),
       })),
     };
   }

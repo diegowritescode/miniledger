@@ -70,7 +70,7 @@ describe('Ledger repositories (integration)', () => {
       await balances.initialize(account.id);
       expect(await balances.find(account.id)).toBe(0n);
 
-      await balances.updateBalance(account.id, 2500n);
+      await balances.updateBalance(account.id, 2500n, 'chain-head');
       expect(await balances.find(account.id)).toBe(2500n);
     });
 
@@ -94,7 +94,16 @@ describe('Ledger repositories (integration)', () => {
       const journal = built.value;
       createdTransactionIds.push(journal.id.value);
 
-      await uow.withTransaction((tx) => journals.append(journal, [-100n, 100n], tx));
+      await uow.withTransaction((tx) =>
+        journals.append(
+          journal,
+          [
+            { balanceAfter: -100n, prevHash: null, hash: 'hash-debit' },
+            { balanceAfter: 100n, prevHash: null, hash: 'hash-credit' },
+          ],
+          tx,
+        ),
+      );
 
       const header = await pool.query<{ currency: string }>(
         'SELECT currency FROM journal_transactions WHERE id = $1',
@@ -130,7 +139,9 @@ describe('Ledger repositories (integration)', () => {
       );
       if (!built.ok) throw new Error('unreachable');
 
-      await expect(journals.append(built.value, [100n])).rejects.toThrow(/balanceAfter/);
+      await expect(
+        journals.append(built.value, [{ balanceAfter: 100n, prevHash: null, hash: 'h' }]),
+      ).rejects.toThrow(/lines/);
     });
   });
 

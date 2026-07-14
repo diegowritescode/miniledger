@@ -1,7 +1,10 @@
 import { type Database } from '../../../db/db.module';
 import { type Tx } from '../../../shared/persistence/unit-of-work';
 import { type JournalTransaction } from '../../domain/journal-transaction';
-import { type JournalTransactionsRepository } from '../../domain/ports/journal-transactions-repository';
+import {
+  type JournalTransactionsRepository,
+  type PostingLine,
+} from '../../domain/ports/journal-transactions-repository';
 import { journalTransactions, postings } from './journal-transactions.schema';
 
 export class DrizzleJournalTransactionsRepository implements JournalTransactionsRepository {
@@ -11,20 +14,16 @@ export class DrizzleJournalTransactionsRepository implements JournalTransactions
     return tx ? (tx.executor as Database) : this.db;
   }
 
-  async append(
-    journal: JournalTransaction,
-    balanceAfter: readonly bigint[],
-    tx?: Tx,
-  ): Promise<void> {
-    if (balanceAfter.length !== journal.postings.length) {
+  async append(journal: JournalTransaction, lines: readonly PostingLine[], tx?: Tx): Promise<void> {
+    if (lines.length !== journal.postings.length) {
       throw new Error(
-        `balanceAfter has ${balanceAfter.length} entries but the transaction has ${journal.postings.length} postings`,
+        `lines has ${lines.length} entries but the transaction has ${journal.postings.length} postings`,
       );
     }
 
     const executor = this.executor(tx);
     await executor.insert(journalTransactions).values(this.toTransactionRow(journal));
-    await executor.insert(postings).values(this.toPostingRows(journal, balanceAfter));
+    await executor.insert(postings).values(this.toPostingRows(journal, lines));
   }
 
   private toTransactionRow(journal: JournalTransaction): typeof journalTransactions.$inferInsert {
@@ -36,13 +35,18 @@ export class DrizzleJournalTransactionsRepository implements JournalTransactions
 
   private toPostingRows(
     journal: JournalTransaction,
-    balanceAfter: readonly bigint[],
+    lines: readonly PostingLine[],
   ): (typeof postings.$inferInsert)[] {
-    return journal.postings.map((posting, index) => ({
-      transactionId: journal.id.value,
-      accountId: posting.accountId.value,
-      amount: posting.amount.amount,
-      balanceAfter: balanceAfter[index]!,
-    }));
+    return journal.postings.map((posting, index) => {
+      const line = lines[index]!;
+      return {
+        transactionId: journal.id.value,
+        accountId: posting.accountId.value,
+        amount: posting.amount.amount,
+        balanceAfter: line.balanceAfter,
+        prevHash: line.prevHash,
+        hash: line.hash,
+      };
+    });
   }
 }

@@ -5,7 +5,7 @@ const DATABASE_URL =
   process.env.DATABASE_URL ?? 'postgres://miniledger:miniledger@localhost:5433/miniledger';
 
 const INSERT_POSTING =
-  'INSERT INTO postings (transaction_id, account_id, amount, balance_after) VALUES ($1, $2, $3, $4)';
+  "INSERT INTO postings (transaction_id, account_id, amount, balance_after, hash) VALUES ($1, $2, $3, $4, 'test-hash')";
 
 describe('Ledger DB-enforced invariants (integration)', () => {
   const pool = new Pool({ connectionString: DATABASE_URL });
