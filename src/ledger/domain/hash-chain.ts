@@ -17,3 +17,25 @@ export function hashPosting(prevHash: string | null, content: PostingContent): s
   ].join('|');
   return createHash('sha256').update(canonical).digest('hex');
 }
+
+export interface ChainEntry {
+  readonly prevHash: string | null;
+  readonly hash: string;
+  readonly content: PostingContent;
+}
+
+export interface ChainVerification {
+  readonly valid: boolean;
+  readonly brokenAtIndex: number | null;
+}
+
+export function verifyChain(entries: readonly ChainEntry[]): ChainVerification {
+  let prev: string | null = null;
+  for (const [index, entry] of entries.entries()) {
+    if (entry.prevHash !== prev || entry.hash !== hashPosting(prev, entry.content)) {
+      return { valid: false, brokenAtIndex: index };
+    }
+    prev = entry.hash;
+  }
+  return { valid: true, brokenAtIndex: null };
+}
