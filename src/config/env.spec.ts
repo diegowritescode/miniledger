@@ -22,6 +22,18 @@ describe('loadEnv', () => {
     expect(env.PORT).toBe(3000);
   });
 
+  it('applies AccessCore defaults and coerces its numeric vars', () => {
+    const env = loadEnv({
+      DATABASE_URL: 'postgres://u:p@localhost:5432/db',
+      ACCESSCORE_CLOCK_SKEW_SECONDS: '45',
+    });
+
+    expect(env.ACCESSCORE_JWT_ISSUER).toBe('https://auth.accesscore.dev');
+    expect(env.ACCESSCORE_JWT_AUDIENCE).toBe('accesscore');
+    expect(env.ACCESSCORE_CHECK_TIMEOUT_MS).toBe(3000);
+    expect(env.ACCESSCORE_CLOCK_SKEW_SECONDS).toBe(45);
+  });
+
   it('throws with actionable detail on invalid configuration (fail-fast)', () => {
     expect(() => loadEnv({})).toThrow(/Invalid environment configuration/);
   });
