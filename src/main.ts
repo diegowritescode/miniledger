@@ -1,8 +1,22 @@
+import 'reflect-metadata';
+import './load-env-file';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ENV } from './config/env.module';
+import type { Env } from './config/env';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.set('trust proxy', 1);
+  app.use(helmet());
+  app.useBodyParser('json', { limit: '32kb' });
+  app.enableShutdownHooks();
+  const env = app.get<Env>(ENV);
+  await app.listen(env.PORT);
+  Logger.log(`MiniLedger API listening on :${env.PORT}`, 'Bootstrap');
 }
-bootstrap();
+
+void bootstrap();

@@ -2,7 +2,7 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "..",
   "testEnvironment": "node",
-  "testRegex": ".e2e-spec.ts$",
+  "testRegex": ".int-spec.ts$",
   "transform": { "^.+\\.ts$": "ts-jest" },
   "globalSetup": "<rootDir>/test/support/global-setup.js",
   "collectCoverageFrom": [
@@ -13,7 +13,7 @@
     "!src/load-env-file.ts",
     "!src/migrate.ts"
   ],
-  "coverageDirectory": "coverage/e2e",
+  "coverageDirectory": "coverage/int",
   "coverageReporters": ["json"],
   "forceExit": true
 }
