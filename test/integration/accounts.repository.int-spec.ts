@@ -18,6 +18,9 @@ describe('DrizzleAccountsRepository (integration)', () => {
   const repository = new DrizzleAccountsRepository(drizzle(pool));
 
   afterEach(async () => {
+    await pool.query(
+      "DELETE FROM account_balances WHERE account_id IN (SELECT id FROM accounts WHERE type = 'user')",
+    );
     await pool.query("DELETE FROM accounts WHERE type = 'user'");
   });
 
