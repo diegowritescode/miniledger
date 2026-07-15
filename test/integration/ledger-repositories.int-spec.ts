@@ -34,7 +34,7 @@ describe('Ledger repositories (integration)', () => {
   const createdTransactionIds: string[] = [];
 
   const persistAccount = async (code: string): Promise<Account> => {
-    const account = Account.openUser(currency(code), clock.now());
+    const account = Account.openUser(currency(code), 'owner-test', clock.now());
     await accounts.save(account);
     createdAccountIds.push(account.id.value);
     return account;
@@ -149,7 +149,7 @@ describe('Ledger repositories (integration)', () => {
     it('initializes an account_balances row when an account is opened via AccountsService', async () => {
       const service = new AccountsService(accounts, balances, uow, clock);
 
-      const result = await service.open({ currency: 'USD' });
+      const result = await service.open({ currency: 'USD', ownerId: 'owner-test' });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       createdAccountIds.push(result.value.id.value);

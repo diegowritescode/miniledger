@@ -17,11 +17,13 @@ interface AccountResponse {
 describe('Accounts (e2e)', () => {
   let app: INestApplication;
   let bearer: string;
+  let bearerOther: string;
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgres://miniledger:miniledger@localhost:5433/miniledger';
     const kit = await createAccessTestKit();
     bearer = `Bearer ${await kit.mintToken()}`;
+    bearerOther = `Bearer ${await kit.mintToken({ subject: 'user-2' })}`;
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(JWKS_RESOLVER)
       .useValue(kit.jwksResolver)
@@ -111,6 +113,39 @@ describe('Accounts (e2e)', () => {
 
     const body = response.body as AccountResponse[];
     expect(Array.isArray(body)).toBe(true);
+    expect(body.some((account) => account.type === 'system')).toBe(true);
+  });
+
+  it('GET /accounts/:id -> 404 when the account belongs to another owner', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/accounts')
+      .set('Authorization', bearer)
+      .send({ currency: 'USD' })
+      .expect(201);
+    const id = (created.body as AccountResponse).id;
+
+    await request(app.getHttpServer())
+      .get(`/accounts/${id}`)
+      .set('Authorization', bearerOther)
+      .expect(404)
+      .expect('Content-Type', /application\/problem\+json/);
+  });
+
+  it("GET /accounts omits another owner's account but keeps system accounts", async () => {
+    const created = await request(app.getHttpServer())
+      .post('/accounts')
+      .set('Authorization', bearer)
+      .send({ currency: 'USD' })
+      .expect(201);
+    const id = (created.body as AccountResponse).id;
+
+    const response = await request(app.getHttpServer())
+      .get('/accounts')
+      .set('Authorization', bearerOther)
+      .expect(200);
+
+    const body = response.body as AccountResponse[];
+    expect(body.some((account) => account.id === id)).toBe(false);
     expect(body.some((account) => account.type === 'system')).toBe(true);
   });
 });

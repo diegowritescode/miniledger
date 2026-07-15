@@ -1,5 +1,7 @@
 import { Body, Controller, Headers, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { AccessTokenGuard } from '../../access/access-token.guard';
+import { CurrentPrincipal } from '../../access/principal.decorator';
+import { type Principal } from '../../access/principal';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import {
@@ -15,6 +17,7 @@ const PROBLEMS: Record<TransferError, { status: number; title: string }> = {
   same_account: { status: 422, title: 'Source and destination must differ' },
   unknown_account: { status: 404, title: 'Account not found' },
   account_currency_mismatch: { status: 422, title: 'Account currency does not match the transfer' },
+  not_account_owner: { status: 403, title: 'You do not own the source account' },
   insufficient_funds: { status: 422, title: 'Insufficient funds' },
   idempotency_conflict: { status: 409, title: 'Idempotency key reused for a different request' },
 };
@@ -28,10 +31,12 @@ export class TransfersController {
   @HttpCode(201)
   async create(
     @Body(new ZodValidationPipe(transferSchema)) body: TransferDto,
+    @CurrentPrincipal() principal: Principal,
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<TransferReceipt> {
     const result = await this.transfers.transfer({
       ...body,
+      ownerId: principal.subject,
       idempotencyKey: idempotencyKey || undefined,
     });
     if (!result.ok) {

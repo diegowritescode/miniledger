@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { type Database } from '../../../db/db.module';
 import { Currency } from '../../../shared/kernel/currency';
 import { type Tx } from '../../../shared/persistence/unit-of-work';
@@ -45,6 +45,14 @@ export class DrizzleAccountsRepository implements AccountsRepository {
     return rows.map((row) => this.toDomain(row));
   }
 
+  async listVisibleTo(ownerId: string, tx?: Tx): Promise<Account[]> {
+    const rows = await this.executor(tx)
+      .select()
+      .from(accounts)
+      .where(or(eq(accounts.ownerId, ownerId), eq(accounts.type, 'system')));
+    return rows.map((row) => this.toDomain(row));
+  }
+
   private toDomain(row: AccountRow): Account {
     const currency = Currency.of(row.currency);
     if (!currency.ok) {
@@ -56,6 +64,7 @@ export class DrizzleAccountsRepository implements AccountsRepository {
       currency: currency.value,
       overdraftFloor: row.overdraftFloor,
       handle: row.handle,
+      ownerId: row.ownerId,
       createdAt: row.createdAt,
     });
   }
@@ -67,6 +76,7 @@ export class DrizzleAccountsRepository implements AccountsRepository {
       currency: account.currency.code,
       overdraftFloor: account.overdraftFloor,
       handle: account.handle,
+      ownerId: account.ownerId,
       createdAt: account.createdAt,
     };
   }

@@ -9,6 +9,7 @@ export interface AccountProps {
   readonly currency: Currency;
   readonly overdraftFloor: bigint | null;
   readonly handle: string | null;
+  readonly ownerId: string | null;
   readonly createdAt: Date;
 }
 
@@ -19,11 +20,12 @@ export class Account {
     readonly currency: Currency,
     readonly overdraftFloor: bigint | null,
     readonly handle: string | null,
+    readonly ownerId: string | null,
     readonly createdAt: Date,
   ) {}
 
-  static openUser(currency: Currency, createdAt: Date): Account {
-    return new Account(AccountId.generate(), 'user', currency, 0n, null, createdAt);
+  static openUser(currency: Currency, ownerId: string, createdAt: Date): Account {
+    return new Account(AccountId.generate(), 'user', currency, 0n, null, ownerId, createdAt);
   }
 
   static reconstitute(props: AccountProps): Account {
@@ -33,6 +35,7 @@ export class Account {
       props.currency,
       props.overdraftFloor,
       props.handle,
+      props.ownerId,
       props.createdAt,
     );
   }
@@ -43,5 +46,9 @@ export class Account {
 
   isOverdraftExempt(): boolean {
     return this.overdraftFloor === null;
+  }
+
+  isOwnedBy(subject: string): boolean {
+    return this.ownerId === subject;
   }
 }

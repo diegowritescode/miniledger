@@ -19,13 +19,14 @@ const currency = (code: string): Currency => {
   return result.value;
 };
 
-const userAccount = (id: AccountId, code = 'USD'): Account =>
+const userAccount = (id: AccountId, code = 'USD', ownerId = 'owner-1'): Account =>
   Account.reconstitute({
     id,
     type: 'user',
     currency: currency(code),
     overdraftFloor: 0n,
     handle: null,
+    ownerId,
     createdAt: at,
   });
 
@@ -36,6 +37,7 @@ const worldAccount = (id: AccountId, code = 'USD'): Account =>
     currency: currency(code),
     overdraftFloor: null,
     handle: '@world',
+    ownerId: null,
     createdAt: at,
   });
 
@@ -65,6 +67,7 @@ const build = (accounts: Account[], locked: Map<string, bigint>, options: Option
     findById,
     findByHandle: jest.fn(),
     list: jest.fn(),
+    listVisibleTo: jest.fn(),
   };
 
   const append = jest.fn<Promise<void>, unknown[]>().mockResolvedValue();
@@ -113,6 +116,7 @@ describe('TransferService', () => {
       to: to.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(true);
@@ -149,6 +153,7 @@ describe('TransferService', () => {
       to: to.value,
       amount: '500',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(true);
@@ -173,6 +178,7 @@ describe('TransferService', () => {
       to: to.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(false);
@@ -191,6 +197,7 @@ describe('TransferService', () => {
       to: to.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(false);
@@ -214,6 +221,7 @@ describe('TransferService', () => {
       to: to.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(false);
@@ -229,6 +237,7 @@ describe('TransferService', () => {
       to: AccountId.generate().value,
       amount: '100',
       currency: 'ZZZ',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(false);
@@ -244,6 +253,7 @@ describe('TransferService', () => {
       to: AccountId.generate().value,
       amount: '0',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(false);
@@ -260,11 +270,63 @@ describe('TransferService', () => {
       to: account.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-1',
     });
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error).toBe('same_account');
+  });
+
+  describe('ownership', () => {
+    it('rejects a transfer whose source is owned by a different subject', async () => {
+      const from = AccountId.generate();
+      const to = AccountId.generate();
+      const { service, append } = build(
+        [userAccount(from, 'USD', 'owner-2'), userAccount(to)],
+        new Map([
+          [from.value, 1000n],
+          [to.value, 0n],
+        ]),
+      );
+
+      const result = await service.transfer({
+        from: from.value,
+        to: to.value,
+        amount: '100',
+        currency: 'USD',
+        ownerId: 'owner-1',
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error).toBe('not_account_owner');
+      expect(append).not.toHaveBeenCalled();
+    });
+
+    it('exempts a system @world source from the ownership check', async () => {
+      const world = AccountId.generate();
+      const to = AccountId.generate();
+      const { service, append } = build(
+        [worldAccount(world), userAccount(to)],
+        new Map([
+          [world.value, 0n],
+          [to.value, 0n],
+        ]),
+      );
+
+      const result = await service.transfer({
+        from: world.value,
+        to: to.value,
+        amount: '500',
+        currency: 'USD',
+        ownerId: 'unrelated-subject',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(append).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('idempotency', () => {
@@ -285,6 +347,7 @@ describe('TransferService', () => {
         to: to.value,
         amount: '100',
         currency: 'USD',
+        ownerId: 'owner-1',
         idempotencyKey: 'key-1',
       });
 
@@ -317,6 +380,7 @@ describe('TransferService', () => {
         to: to.value,
         amount: '100',
         currency: 'USD',
+        ownerId: 'owner-1',
         idempotencyKey: 'key-1',
       });
 
@@ -350,6 +414,7 @@ describe('TransferService', () => {
         to: to.value,
         amount: '100',
         currency: 'USD',
+        ownerId: 'owner-1',
         idempotencyKey: 'key-1',
       });
 
