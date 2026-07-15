@@ -42,6 +42,7 @@ the `AccessCorePermissionGuard`. The guard forwards the caller's bearer token to
 | ------------------------- | ----------------- |
 | `POST /accounts`          | `ledger.open`     |
 | `POST /transfers`         | `ledger.transfer` |
+| `POST /reversals`         | `ledger.reverse`  |
 | `GET /audit/accounts/:id` | `ledger.audit`    |
 | `GET /audit/conservation` | `ledger.audit`    |
 
@@ -69,6 +70,10 @@ guard:
 - **`POST /transfers`** requires the caller to own the **source** account (`from.owner_id ==
 subject`), else **403 `not_account_owner`**. The `@world` system account is exempt, so any
   authorized operator can deposit from it.
+- **`POST /reversals`** is **capability-gated only** (`ledger.reverse`), not ownership-gated: a
+  reversal is a corrective back-office action that posts a compensating entry, so the source-ownership
+  check is deliberately skipped (the shared posting core takes `requireOwner: null`). Restricting who
+  may reverse is done at the capability layer in AccessCore, not per source account.
 
 ### Defense in depth — the double verify
 
@@ -153,16 +158,17 @@ namespace ledger {
   relation operator
   permission ledger.open     = operator
   permission ledger.transfer = operator
+  permission ledger.reverse  = operator
   permission ledger.audit    = operator
 }
 
 # 2. Grant a principal the operator relation on the miniledger resource, scoped to their org.
-#    Any bearer whose token `sub` == <subject> can then open accounts, transfer, and audit.
+#    Any bearer whose token `sub` == <subject> can then open accounts, transfer, reverse, and audit.
 grant  ledger:miniledger#operator@user:<subject>
 ```
 
 After seeding, a token for `<subject>` (in the matching `org`) passes `check()` for
-`ledger.open`/`ledger.transfer`/`ledger.audit`; anyone else is denied **403**. Because the SDK's PEP
+`ledger.open`/`ledger.transfer`/`ledger.reverse`/`ledger.audit`; anyone else is denied **403**. Because the SDK's PEP
 resolves the resource as `{type:'ledger', id:'miniledger'}` and the check is org-scoped via the
 token's `org` claim, tenant isolation is automatic — no per-account tuples are written to AccessCore
 ([ADR-009](adr/009-accesscore-integration.md) rejects that as a two-system commit).

@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DrizzleUnitOfWork } from '../../src/db/drizzle-unit-of-work';
 import { AuditService } from '../../src/ledger/application/audit.service';
+import { LedgerPoster } from '../../src/ledger/application/ledger-poster';
 import { TransferService } from '../../src/ledger/application/transfer.service';
 import { Account } from '../../src/ledger/domain/account';
 import { type AccountId } from '../../src/ledger/domain/account-id';
@@ -31,14 +32,8 @@ describe('Audit verifier (integration)', () => {
   const idempotency = new DrizzleIdempotencyRepository(db);
   const auditRepo = new DrizzleAuditRepository(db);
   const uow = new DrizzleUnitOfWork(db);
-  const transfers = new TransferService(
-    accounts,
-    balances,
-    journals,
-    idempotency,
-    new DrizzleOutboxRepository(db),
-    uow,
-  );
+  const poster = new LedgerPoster(accounts, balances, journals, new DrizzleOutboxRepository(db));
+  const transfers = new TransferService(poster, idempotency, uow);
   const audit = new AuditService(accounts, auditRepo);
 
   const createdAccountIds: string[] = [];

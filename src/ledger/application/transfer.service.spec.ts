@@ -10,6 +10,7 @@ import {
 } from '../domain/ports/idempotency-repository';
 import { type JournalTransactionsRepository } from '../domain/ports/journal-transactions-repository';
 import { type OutboxRepository } from '../domain/ports/outbox-repository';
+import { LedgerPoster } from './ledger-poster';
 import { TransferService } from './transfer.service';
 
 const at = new Date('2026-06-06T06:00:00.000Z');
@@ -95,15 +96,10 @@ const build = (accounts: Account[], locked: Map<string, bigint>, options: Option
   const emit = jest.fn<Promise<void>, unknown[]>().mockResolvedValue();
   const outbox: OutboxRepository = { append: emit };
 
+  const poster = new LedgerPoster(accountsRepo, balances, journals, outbox);
+
   return {
-    service: new TransferService(
-      accountsRepo,
-      balances,
-      journals,
-      idempotency,
-      outbox,
-      passthroughUow,
-    ),
+    service: new TransferService(poster, idempotency, passthroughUow),
     append,
     updateBalance,
     claim,

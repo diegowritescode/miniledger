@@ -6,24 +6,13 @@ import { UNIT_OF_WORK, type Tx, type UnitOfWork } from '../../shared/persistence
 import { err, ok, type Result } from '../../shared/result';
 import { AccountId } from '../domain/account-id';
 import {
-  ACCOUNT_BALANCES_REPOSITORY,
-  type AccountBalancesRepository,
-} from '../domain/ports/account-balances-repository';
-import { ACCOUNTS_REPOSITORY, type AccountsRepository } from '../domain/ports/accounts-repository';
-import {
   IDEMPOTENCY_REPOSITORY,
   type IdempotencyRepository,
 } from '../domain/ports/idempotency-repository';
-import {
-  JOURNAL_TRANSACTIONS_REPOSITORY,
-  type JournalTransactionsRepository,
-  type PostingLine,
-} from '../domain/ports/journal-transactions-repository';
-import { OUTBOX_REPOSITORY, type OutboxRepository } from '../domain/ports/outbox-repository';
-import { type Account } from '../domain/account';
-import { hashPosting } from '../domain/hash-chain';
 import { JournalTransaction } from '../domain/journal-transaction';
-import { isSufficient } from '../domain/overdraft';
+import { LedgerPoster, LedgerPostingFailure, type TransferReceipt } from './ledger-poster';
+
+export type { PostingReceipt, TransferReceipt } from './ledger-poster';
 
 export type TransferError =
   | 'unknown_currency'
@@ -44,18 +33,6 @@ export interface TransferInput {
   readonly idempotencyKey?: string;
 }
 
-export interface PostingReceipt {
-  readonly accountId: string;
-  readonly amount: string;
-  readonly balanceAfter: string;
-}
-
-export interface TransferReceipt {
-  readonly id: string;
-  readonly currency: string;
-  readonly postings: readonly PostingReceipt[];
-}
-
 class TransferFailure extends Error {
   constructor(readonly code: TransferError) {
     super(code);
@@ -65,12 +42,8 @@ class TransferFailure extends Error {
 @Injectable()
 export class TransferService {
   constructor(
-    @Inject(ACCOUNTS_REPOSITORY) private readonly accounts: AccountsRepository,
-    @Inject(ACCOUNT_BALANCES_REPOSITORY) private readonly balances: AccountBalancesRepository,
-    @Inject(JOURNAL_TRANSACTIONS_REPOSITORY)
-    private readonly journals: JournalTransactionsRepository,
+    private readonly poster: LedgerPoster,
     @Inject(IDEMPOTENCY_REPOSITORY) private readonly idempotency: IdempotencyRepository,
-    @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
     @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
   ) {}
 
@@ -97,6 +70,7 @@ export class TransferService {
       return ok(receipt);
     } catch (error) {
       if (error instanceof TransferFailure) return err(error.code);
+      if (error instanceof LedgerPostingFailure) return err(error.code);
       throw error;
     }
   }
@@ -117,85 +91,16 @@ export class TransferService {
       }
     }
 
-    const receipt = await this.execute(journal, currency, ownerId, tx);
+    const receipt = await this.poster.post(
+      journal,
+      currency,
+      { requireOwner: ownerId, eventType: 'transfer.posted' },
+      tx,
+    );
 
     if (idempotencyKey) {
       await this.idempotency.complete(idempotencyKey, journal.id.value, receipt, tx);
     }
-    return receipt;
-  }
-
-  private async execute(
-    journal: JournalTransaction,
-    currency: Currency,
-    ownerId: string,
-    tx: Tx,
-  ): Promise<TransferReceipt> {
-    const involved = journal.postings.map((posting) => posting.accountId);
-    const accounts = await Promise.all(involved.map((id) => this.accounts.findById(id, tx)));
-
-    const floors = new Map<string, bigint | null>();
-    const byId = new Map<string, Account>();
-    for (const account of accounts) {
-      if (!account) throw new TransferFailure('unknown_account');
-      if (!account.currency.equals(currency))
-        throw new TransferFailure('account_currency_mismatch');
-      floors.set(account.id.value, account.overdraftFloor);
-      byId.set(account.id.value, account);
-    }
-
-    for (const posting of journal.postings) {
-      if (!posting.amount.isNegative()) continue;
-      const source = byId.get(posting.accountId.value);
-      if (source && !source.isSystem() && !source.isOwnedBy(ownerId)) {
-        throw new TransferFailure('not_account_owner');
-      }
-    }
-
-    const locked = await this.balances.lockForUpdate(involved, tx);
-    const running = new Map(locked);
-    const lines: PostingLine[] = [];
-    for (const posting of journal.postings) {
-      const key = posting.accountId.value;
-      const state = running.get(key);
-      if (state === undefined) throw new TransferFailure('unknown_account');
-      if (
-        !isSufficient(Money.of(state.balance, currency), posting.amount, floors.get(key) ?? null)
-      ) {
-        throw new TransferFailure('insufficient_funds');
-      }
-      const balanceAfter = state.balance + posting.amount.amount;
-      const hash = hashPosting(state.chainHash, {
-        transactionId: journal.id.value,
-        accountId: key,
-        amount: posting.amount.amount,
-        balanceAfter,
-      });
-      lines.push({ balanceAfter, prevHash: state.chainHash, hash });
-      running.set(key, { balance: balanceAfter, chainHash: hash });
-    }
-
-    await this.journals.append(journal, lines, tx);
-    for (const [key, state] of running) {
-      await this.balances.updateBalance(
-        AccountId.fromString(key),
-        state.balance,
-        state.chainHash,
-        tx,
-      );
-    }
-
-    const receipt: TransferReceipt = {
-      id: journal.id.value,
-      currency: currency.code,
-      postings: journal.postings.map((posting, index) => ({
-        accountId: posting.accountId.value,
-        amount: posting.amount.amount.toString(),
-        balanceAfter: lines[index]!.balanceAfter.toString(),
-      })),
-    };
-
-    await this.outbox.append({ type: 'transfer.posted', payload: receipt }, tx);
     return receipt;
   }
 
