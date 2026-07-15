@@ -4,6 +4,7 @@ export * from '../ledger/infrastructure/persistence/accounts.schema';
 export * from '../ledger/infrastructure/persistence/journal-transactions.schema';
 export * from '../ledger/infrastructure/persistence/account-balances.schema';
 export * from '../ledger/infrastructure/persistence/idempotency.schema';
+export * from '../ledger/infrastructure/persistence/outbox.schema';
 
 export const appMeta = pgTable('app_meta', {
   key: text('key').primaryKey(),

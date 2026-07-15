@@ -19,6 +19,7 @@ import {
   type JournalTransactionsRepository,
   type PostingLine,
 } from '../domain/ports/journal-transactions-repository';
+import { OUTBOX_REPOSITORY, type OutboxRepository } from '../domain/ports/outbox-repository';
 import { type Account } from '../domain/account';
 import { hashPosting } from '../domain/hash-chain';
 import { JournalTransaction } from '../domain/journal-transaction';
@@ -69,6 +70,7 @@ export class TransferService {
     @Inject(JOURNAL_TRANSACTIONS_REPOSITORY)
     private readonly journals: JournalTransactionsRepository,
     @Inject(IDEMPOTENCY_REPOSITORY) private readonly idempotency: IdempotencyRepository,
+    @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
     @Inject(UNIT_OF_WORK) private readonly uow: UnitOfWork,
   ) {}
 
@@ -183,7 +185,7 @@ export class TransferService {
       );
     }
 
-    return {
+    const receipt: TransferReceipt = {
       id: journal.id.value,
       currency: currency.code,
       postings: journal.postings.map((posting, index) => ({
@@ -192,6 +194,9 @@ export class TransferService {
         balanceAfter: lines[index]!.balanceAfter.toString(),
       })),
     };
+
+    await this.outbox.append({ type: 'transfer.posted', payload: receipt }, tx);
+    return receipt;
   }
 
   private parseAmount(raw: string): bigint | null {

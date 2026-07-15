@@ -9,6 +9,7 @@ import {
   type IdempotencyRepository,
 } from '../domain/ports/idempotency-repository';
 import { type JournalTransactionsRepository } from '../domain/ports/journal-transactions-repository';
+import { type OutboxRepository } from '../domain/ports/outbox-repository';
 import { TransferService } from './transfer.service';
 
 const at = new Date('2026-06-06T06:00:00.000Z');
@@ -55,6 +56,7 @@ interface Mocks {
   updateBalance: jest.Mock;
   claim: jest.Mock<Promise<IdempotencyClaim>, [string, string, Tx]>;
   complete: jest.Mock;
+  emit: jest.Mock;
 }
 
 const build = (accounts: Account[], locked: Map<string, bigint>, options: Options = {}): Mocks => {
@@ -90,12 +92,23 @@ const build = (accounts: Account[], locked: Map<string, bigint>, options: Option
   const complete = jest.fn<Promise<void>, unknown[]>().mockResolvedValue();
   const idempotency: IdempotencyRepository = { claim, complete };
 
+  const emit = jest.fn<Promise<void>, unknown[]>().mockResolvedValue();
+  const outbox: OutboxRepository = { append: emit };
+
   return {
-    service: new TransferService(accountsRepo, balances, journals, idempotency, passthroughUow),
+    service: new TransferService(
+      accountsRepo,
+      balances,
+      journals,
+      idempotency,
+      outbox,
+      passthroughUow,
+    ),
     append,
     updateBalance,
     claim,
     complete,
+    emit,
   };
 };
 
@@ -422,6 +435,59 @@ describe('TransferService', () => {
       if (result.ok) return;
       expect(result.error).toBe('idempotency_conflict');
       expect(append).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('outbox', () => {
+    it('emits transfer.posted with the receipt on a successful transfer', async () => {
+      const from = AccountId.generate();
+      const to = AccountId.generate();
+      const { service, emit } = build(
+        [userAccount(from), userAccount(to)],
+        new Map([
+          [from.value, 1000n],
+          [to.value, 0n],
+        ]),
+      );
+
+      const result = await service.transfer({
+        from: from.value,
+        to: to.value,
+        amount: '100',
+        currency: 'USD',
+        ownerId: 'owner-1',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledWith(
+        { type: 'transfer.posted', payload: result.value },
+        expect.anything(),
+      );
+    });
+
+    it('does not emit when the transfer fails', async () => {
+      const from = AccountId.generate();
+      const to = AccountId.generate();
+      const { service, emit } = build(
+        [userAccount(from), userAccount(to)],
+        new Map([
+          [from.value, 50n],
+          [to.value, 0n],
+        ]),
+      );
+
+      const result = await service.transfer({
+        from: from.value,
+        to: to.value,
+        amount: '100',
+        currency: 'USD',
+        ownerId: 'owner-1',
+      });
+
+      expect(result.ok).toBe(false);
+      expect(emit).not.toHaveBeenCalled();
     });
   });
 });

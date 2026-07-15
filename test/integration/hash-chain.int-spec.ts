@@ -9,6 +9,7 @@ import { DrizzleAccountBalancesRepository } from '../../src/ledger/infrastructur
 import { DrizzleAccountsRepository } from '../../src/ledger/infrastructure/persistence/drizzle-accounts.repository';
 import { DrizzleIdempotencyRepository } from '../../src/ledger/infrastructure/persistence/drizzle-idempotency.repository';
 import { DrizzleJournalTransactionsRepository } from '../../src/ledger/infrastructure/persistence/drizzle-journal-transactions.repository';
+import { DrizzleOutboxRepository } from '../../src/ledger/infrastructure/persistence/drizzle-outbox.repository';
 import { Currency } from '../../src/shared/kernel/currency';
 
 const DATABASE_URL =
@@ -38,7 +39,14 @@ describe('Posting hash chain (integration)', () => {
   const journals = new DrizzleJournalTransactionsRepository(db);
   const idempotency = new DrizzleIdempotencyRepository(db);
   const uow = new DrizzleUnitOfWork(db);
-  const service = new TransferService(accounts, balances, journals, idempotency, uow);
+  const service = new TransferService(
+    accounts,
+    balances,
+    journals,
+    idempotency,
+    new DrizzleOutboxRepository(db),
+    uow,
+  );
 
   const createdAccountIds: string[] = [];
   let worldUsd: AccountId;
