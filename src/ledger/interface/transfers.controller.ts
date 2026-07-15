@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { CurrentPrincipal } from '../../access/principal.decorator';
 import { type Principal } from '../../access/principal';
@@ -29,6 +30,7 @@ export class TransfersController {
 
   @Post()
   @HttpCode(201)
+  @RequirePermission('ledger.transfer', () => ({ type: 'ledger', id: 'miniledger' }))
   async create(
     @Body(new ZodValidationPipe(transferSchema)) body: TransferDto,
     @CurrentPrincipal() principal: Principal,

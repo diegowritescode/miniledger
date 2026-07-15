@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { CurrentPrincipal } from '../../access/principal.decorator';
 import { type Principal } from '../../access/principal';
@@ -23,6 +24,7 @@ export class AccountsController {
 
   @Post()
   @HttpCode(201)
+  @RequirePermission('ledger.open', () => ({ type: 'ledger', id: 'miniledger' }))
   async open(
     @Body(new ZodValidationPipe(openAccountSchema)) body: OpenAccountDto,
     @CurrentPrincipal() principal: Principal,
