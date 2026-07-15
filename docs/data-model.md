@@ -21,14 +21,15 @@ two kinds: ordinary **`user`** accounts and the privileged **`system`** account 
 
 ### `accounts`
 
-| Column            | Type          | Null | Default             | Notes                                                |
-| ----------------- | ------------- | ---- | ------------------- | ---------------------------------------------------- |
-| `id`              | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                         |
-| `type`            | `text`        | no   | —                   | `'user'` or `'system'` (see `accounts_type_check`).  |
-| `currency`        | `text`        | no   | —                   | ISO 4217 code; an account fixes one currency.        |
-| `overdraft_floor` | `bigint`      | yes  | —                   | Minor units. `NULL` = overdraft-exempt.              |
-| `handle`          | `text`        | yes  | —                   | `'@world'` for the system account; `NULL` for users. |
-| `created_at`      | `timestamptz` | no   | `now()`             | Creation instant.                                    |
+| Column            | Type          | Null | Default             | Notes                                                                                                                                        |
+| ----------------- | ------------- | ---- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                                                                                                                 |
+| `type`            | `text`        | no   | —                   | `'user'` or `'system'` (see `accounts_type_check`).                                                                                          |
+| `currency`        | `text`        | no   | —                   | ISO 4217 code; an account fixes one currency.                                                                                                |
+| `overdraft_floor` | `bigint`      | yes  | —                   | Minor units. `NULL` = overdraft-exempt.                                                                                                      |
+| `handle`          | `text`        | yes  | —                   | `'@world'` for the system account; `NULL` for users.                                                                                         |
+| `owner_id`        | `text`        | yes  | —                   | Opaque AccessCore subject that owns the account (no FK; `NULL` for system accounts). Indexed ([ADR-009](adr/009-accesscore-integration.md)). |
+| `created_at`      | `timestamptz` | no   | `now()`             | Creation instant.                                                                                                                            |
 
 `overdraft_floor` is stored as `bigint` in minor units, consistent with the money representation in
 [ADR-004](adr/004-money-representation.md); values are marshalled as JS `bigint` at the row↔domain
@@ -91,7 +92,7 @@ withdrawals, refunds, and reversals are the same primitive with different legs. 
 | `id`             | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                                                                       |
 | `transaction_id` | `uuid`        | no   | —                   | FK → `journal_transactions(id)`. Indexed.                                                          |
 | `account_id`     | `uuid`        | no   | —                   | FK → `accounts(id)`. Indexed.                                                                      |
-| `amount`         | `bigint`      | no   | —                   | Signed minor units ([ADR-004](adr/004-money-representation.md)); `< 0` debit, `> 0` credit.        |
+| `amount`         | `bigint`      | no   | —                   | Signed minor units ([ADR-004](adr/004-money-representation.md)); `> 0` debit, `< 0` credit.        |
 | `balance_after`  | `bigint`      | no   | —                   | The account's balance immediately after this posting.                                              |
 | `seq`            | `bigint`      | no   | identity            | Monotonic insertion order (the per-account chain order).                                           |
 | `prev_hash`      | `text`        | yes  | —                   | Previous chain head for this account (`NULL` at genesis) ([ADR-008](adr/008-audit-hash-chain.md)). |
@@ -204,6 +205,7 @@ every environment by the lean `drizzle-orm` runtime migrator ([ADR-003](adr/003-
 | `0004_ledger_invariants`    | Custom SQL: the deferred sum-zero constraint trigger, `REVOKE UPDATE, DELETE ON postings`, and the idempotent balance backfill.       |
 | `0005_colossal_whizzer`     | `idempotency_keys` table (FK → `journal_transactions`).                                                                               |
 | `0006_sour_zaran`           | Per-account hash chain: `postings.seq`/`prev_hash`/`hash` and `account_balances.chain_hash` ([ADR-008](adr/008-audit-hash-chain.md)). |
+| `0007_late_susan_delgado`   | `accounts.owner_id` + its index for local ownership ([ADR-009](adr/009-accesscore-integration.md)).                                   |
 
 The `@world` seed is **idempotent** — each insert is guarded by
 `WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE handle = '@world' AND currency = …)` — so applying

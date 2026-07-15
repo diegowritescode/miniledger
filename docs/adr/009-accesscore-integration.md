@@ -31,12 +31,14 @@ ownership locally.**
 - **AuthN — a local `AccessTokenGuard`.** It verifies the AccessCore EdDSA (Ed25519) access token
   **offline** via the AccessCore JWKS (`/.well-known/jwks.json`) using `jose`: signature, `iss`,
   `aud`, `exp`/`nbf` with a 30s clock skew. It attaches `request.principal` (`{subject, org,
-sessionId, assuranceLevel}`), exposed via `@Principal()`. Config: `ACCESSCORE_BASE_URL`,
+sessionId, assuranceLevel}`), exposed via `@CurrentPrincipal()`. Config: `ACCESSCORE_BASE_URL`,
   `ACCESSCORE_JWKS_URL`, `ACCESSCORE_JWT_ISSUER`, `ACCESSCORE_JWT_AUDIENCE`,
   `ACCESSCORE_CLOCK_SKEW_SECONDS`, `ACCESSCORE_CHECK_TIMEOUT_MS`. Failures → RFC 7807 `401`. The
   JWKS resolver sits behind an injectable port so tests use a local key set (no network). This guard
   is the reference implementation for a future SDK authN guard — the gap the first consumer surfaced.
-- **AuthZ — the SDK PEP for coarse capability.** `AccessCoreModule.forRoot({baseUrl})` +
+- **AuthZ — the SDK PEP for coarse capability.** The SDK's `AccessCorePermissionGuard`, with the
+  client built from the validated `ENV` via a provider factory (the SDK's `forRoot` takes only static
+  config — MiniLedger wires the client itself, another gap the first consumer surfaced), and
   `@RequirePermission` on the privileged routes: `POST /accounts` (`ledger.open`), `POST /transfers`
   (`ledger.transfer`), `GET /audit/*` (`ledger.audit`) — all on the resource
   `{type:'ledger', id:'miniledger'}` (actions are `namespace.verb`, namespace == resource type;
