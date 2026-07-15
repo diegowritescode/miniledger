@@ -19,6 +19,7 @@ import {
   type JournalTransactionsRepository,
   type PostingLine,
 } from '../domain/ports/journal-transactions-repository';
+import { type Account } from '../domain/account';
 import { hashPosting } from '../domain/hash-chain';
 import { JournalTransaction } from '../domain/journal-transaction';
 import { isSufficient } from '../domain/overdraft';
@@ -29,6 +30,7 @@ export type TransferError =
   | 'same_account'
   | 'unknown_account'
   | 'account_currency_mismatch'
+  | 'not_account_owner'
   | 'insufficient_funds'
   | 'idempotency_conflict';
 
@@ -37,6 +39,7 @@ export interface TransferInput {
   readonly to: string;
   readonly amount: string;
   readonly currency: string;
+  readonly ownerId: string;
   readonly idempotencyKey?: string;
 }
 
@@ -87,7 +90,7 @@ export class TransferService {
 
     try {
       const receipt = await this.uow.withTransaction((tx) =>
-        this.run(journal, currency.value, input.idempotencyKey, fingerprint, tx),
+        this.run(journal, currency.value, input.ownerId, input.idempotencyKey, fingerprint, tx),
       );
       return ok(receipt);
     } catch (error) {
@@ -99,6 +102,7 @@ export class TransferService {
   private async run(
     journal: JournalTransaction,
     currency: Currency,
+    ownerId: string,
     idempotencyKey: string | undefined,
     fingerprint: string,
     tx: Tx,
@@ -111,7 +115,7 @@ export class TransferService {
       }
     }
 
-    const receipt = await this.execute(journal, currency, tx);
+    const receipt = await this.execute(journal, currency, ownerId, tx);
 
     if (idempotencyKey) {
       await this.idempotency.complete(idempotencyKey, journal.id.value, receipt, tx);
@@ -122,17 +126,28 @@ export class TransferService {
   private async execute(
     journal: JournalTransaction,
     currency: Currency,
+    ownerId: string,
     tx: Tx,
   ): Promise<TransferReceipt> {
     const involved = journal.postings.map((posting) => posting.accountId);
     const accounts = await Promise.all(involved.map((id) => this.accounts.findById(id, tx)));
 
     const floors = new Map<string, bigint | null>();
+    const byId = new Map<string, Account>();
     for (const account of accounts) {
       if (!account) throw new TransferFailure('unknown_account');
       if (!account.currency.equals(currency))
         throw new TransferFailure('account_currency_mismatch');
       floors.set(account.id.value, account.overdraftFloor);
+      byId.set(account.id.value, account);
+    }
+
+    for (const posting of journal.postings) {
+      if (!posting.amount.isNegative()) continue;
+      const source = byId.get(posting.accountId.value);
+      if (source && !source.isSystem() && !source.isOwnedBy(ownerId)) {
+        throw new TransferFailure('not_account_owner');
+      }
     }
 
     const locked = await this.balances.lockForUpdate(involved, tx);

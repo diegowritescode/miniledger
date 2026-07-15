@@ -27,11 +27,13 @@ interface TransferResponse {
 describe('Transfers (e2e)', () => {
   let app: INestApplication;
   let bearer: string;
+  let bearerOther: string;
 
   beforeAll(async () => {
     process.env.DATABASE_URL ??= 'postgres://miniledger:miniledger@localhost:5433/miniledger';
     const kit = await createAccessTestKit();
     bearer = `Bearer ${await kit.mintToken()}`;
+    bearerOther = `Bearer ${await kit.mintToken({ subject: 'user-2' })}`;
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(JWKS_RESOLVER)
       .useValue(kit.jwksResolver)
@@ -109,6 +111,20 @@ describe('Transfers (e2e)', () => {
     const received = transferBody.postings.find((posting) => posting.accountId === b);
     expect(debited?.balanceAfter).toBe('700');
     expect(received?.balanceAfter).toBe('300');
+  });
+
+  it('rejects a transfer whose source belongs to another owner (403 problem+json)', async () => {
+    const a = await openAccount();
+    const b = await openAccount();
+    await deposit(a, '100');
+
+    const response = await request(app.getHttpServer())
+      .post('/transfers')
+      .set('Authorization', bearerOther)
+      .send({ from: a, to: b, amount: '10', currency: 'USD' })
+      .expect(403)
+      .expect('Content-Type', /application\/problem\+json/);
+    expect((response.body as { detail: string }).detail).toBe('not_account_owner');
   });
 
   it('rejects an overdrawing transfer with 422 problem+json', async () => {

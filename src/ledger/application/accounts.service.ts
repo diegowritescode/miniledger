@@ -15,6 +15,7 @@ export type OpenAccountError = 'unknown_currency';
 
 export interface OpenAccountInput {
   readonly currency: string;
+  readonly ownerId: string;
 }
 
 @Injectable()
@@ -30,7 +31,7 @@ export class AccountsService {
     const currency = Currency.of(input.currency);
     if (!currency.ok) return err('unknown_currency');
 
-    const account = Account.openUser(currency.value, this.clock.now());
+    const account = Account.openUser(currency.value, input.ownerId, this.clock.now());
     await this.uow.withTransaction(async (tx) => {
       await this.accounts.save(account, tx);
       await this.balances.initialize(account.id, tx);
@@ -39,11 +40,13 @@ export class AccountsService {
     return ok(account);
   }
 
-  getById(id: string): Promise<Account | null> {
-    return this.accounts.findById(AccountId.fromString(id));
+  async getVisible(id: string, subject: string): Promise<Account | null> {
+    const account = await this.accounts.findById(AccountId.fromString(id));
+    if (!account) return null;
+    return account.isSystem() || account.isOwnedBy(subject) ? account : null;
   }
 
-  list(): Promise<Account[]> {
-    return this.accounts.list();
+  listVisible(subject: string): Promise<Account[]> {
+    return this.accounts.listVisibleTo(subject);
   }
 }

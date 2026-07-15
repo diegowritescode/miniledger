@@ -66,7 +66,7 @@ describe('Audit verifier (integration)', () => {
   });
 
   const openAccount = async (): Promise<AccountId> => {
-    const account = Account.openUser(USD, new Date('2026-08-08T08:00:00.000Z'));
+    const account = Account.openUser(USD, 'owner-test', new Date('2026-08-08T08:00:00.000Z'));
     await accounts.save(account);
     await balances.initialize(account.id);
     createdAccountIds.push(account.id.value);
@@ -79,6 +79,7 @@ describe('Audit verifier (integration)', () => {
       to: to.value,
       amount,
       currency: 'USD',
+      ownerId: 'owner-test',
     });
     if (!result.ok) throw new Error(`transfer failed: ${result.error}`);
   };

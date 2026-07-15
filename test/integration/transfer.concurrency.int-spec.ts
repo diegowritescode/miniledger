@@ -62,7 +62,7 @@ describe('Transfer concurrency (integration)', () => {
   });
 
   const openAccount = async (): Promise<AccountId> => {
-    const account = Account.openUser(USD, new Date('2026-06-06T06:00:00.000Z'));
+    const account = Account.openUser(USD, 'owner-test', new Date('2026-06-06T06:00:00.000Z'));
     await accounts.save(account);
     await balances.initialize(account.id);
     createdAccountIds.push(account.id.value);
@@ -75,6 +75,7 @@ describe('Transfer concurrency (integration)', () => {
       to: to.value,
       amount: amount.toString(),
       currency: 'USD',
+      ownerId: 'owner-test',
     });
     if (!result.ok) throw new Error(`deposit failed: ${result.error}`);
   };
@@ -94,7 +95,13 @@ describe('Transfer concurrency (integration)', () => {
 
     const results = await Promise.all(
       Array.from({ length: 20 }, () =>
-        service.transfer({ from: a.value, to: b.value, amount: '10', currency: 'USD' }),
+        service.transfer({
+          from: a.value,
+          to: b.value,
+          amount: '10',
+          currency: 'USD',
+          ownerId: 'owner-test',
+        }),
       ),
     );
     expect(results.every((result) => result.ok)).toBe(true);
@@ -112,7 +119,13 @@ describe('Transfer concurrency (integration)', () => {
 
     const results = await Promise.all(
       Array.from({ length: 10 }, () =>
-        service.transfer({ from: a.value, to: b.value, amount: '30', currency: 'USD' }),
+        service.transfer({
+          from: a.value,
+          to: b.value,
+          amount: '30',
+          currency: 'USD',
+          ownerId: 'owner-test',
+        }),
       ),
     );
 
@@ -134,10 +147,22 @@ describe('Transfer concurrency (integration)', () => {
 
     const results = await Promise.all([
       ...Array.from({ length: 10 }, () =>
-        service.transfer({ from: a.value, to: b.value, amount: '5', currency: 'USD' }),
+        service.transfer({
+          from: a.value,
+          to: b.value,
+          amount: '5',
+          currency: 'USD',
+          ownerId: 'owner-test',
+        }),
       ),
       ...Array.from({ length: 10 }, () =>
-        service.transfer({ from: b.value, to: a.value, amount: '5', currency: 'USD' }),
+        service.transfer({
+          from: b.value,
+          to: a.value,
+          amount: '5',
+          currency: 'USD',
+          ownerId: 'owner-test',
+        }),
       ),
     ]);
 

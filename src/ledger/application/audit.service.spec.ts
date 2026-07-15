@@ -24,6 +24,7 @@ const userAccount = (id: AccountId): Account =>
     currency: USD,
     overdraftFloor: 0n,
     handle: null,
+    ownerId: 'owner-1',
     createdAt: new Date('2026-06-06T06:00:00.000Z'),
   });
 
@@ -68,6 +69,7 @@ const build = (options: Options): AuditService => {
     save: jest.fn(),
     findByHandle: jest.fn(),
     list: jest.fn(),
+    listVisibleTo: jest.fn(),
     findById: jest.fn().mockResolvedValue(options.account ?? null),
   };
   const audit: AuditRepository = {

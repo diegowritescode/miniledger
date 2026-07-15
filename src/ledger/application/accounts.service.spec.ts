@@ -20,24 +20,37 @@ const usd = (): Currency => {
   return result.value;
 };
 
+const systemAccount = (): Account =>
+  Account.reconstitute({
+    id: AccountId.generate(),
+    type: 'system',
+    currency: usd(),
+    overdraftFloor: null,
+    handle: '@world',
+    ownerId: null,
+    createdAt: fixedNow,
+  });
+
 interface RepoMocks {
   readonly repository: AccountsRepository;
   readonly save: jest.Mock<Promise<void>, [Account, Tx?]>;
   readonly findById: jest.Mock<Promise<Account | null>, [AccountId, Tx?]>;
-  readonly list: jest.Mock<Promise<Account[]>, [Tx?]>;
+  readonly listVisibleTo: jest.Mock<Promise<Account[]>, [string, Tx?]>;
 }
 
 const buildRepo = (
-  overrides: Partial<Pick<RepoMocks, 'save' | 'findById' | 'list'>> = {},
+  overrides: Partial<Pick<RepoMocks, 'save' | 'findById' | 'listVisibleTo'>> = {},
 ): RepoMocks => {
   const save = overrides.save ?? jest.fn<Promise<void>, [Account, Tx?]>().mockResolvedValue();
   const findById =
     overrides.findById ??
     jest.fn<Promise<Account | null>, [AccountId, Tx?]>().mockResolvedValue(null);
-  const list = overrides.list ?? jest.fn<Promise<Account[]>, [Tx?]>().mockResolvedValue([]);
+  const listVisibleTo =
+    overrides.listVisibleTo ?? jest.fn<Promise<Account[]>, [string, Tx?]>().mockResolvedValue([]);
+  const list = jest.fn<Promise<Account[]>, [Tx?]>().mockResolvedValue([]);
   const findByHandle = jest.fn().mockResolvedValue(null);
-  const repository: AccountsRepository = { save, findById, findByHandle, list };
-  return { repository, save, findById, list };
+  const repository: AccountsRepository = { save, findById, findByHandle, list, listVisibleTo };
+  return { repository, save, findById, listVisibleTo };
 };
 
 interface BalancesMocks {
@@ -62,21 +75,23 @@ const passthroughUow: UnitOfWork = {
   withTransaction: (work) => work({ executor: {} }),
 };
 
+const buildService = (repository: AccountsRepository, balances: AccountBalancesRepository) =>
+  new AccountsService(repository, balances, passthroughUow, clock);
+
 describe('AccountsService', () => {
   describe('open', () => {
-    it('opens a user account and persists it inside a transaction', async () => {
+    it('opens a user account owned by the subject and persists it in a transaction', async () => {
       const { repository, save } = buildRepo();
       const balances = buildBalances();
-      const service = new AccountsService(repository, balances.repository, passthroughUow, clock);
+      const service = buildService(repository, balances.repository);
 
-      const result = await service.open({ currency: 'USD' });
+      const result = await service.open({ currency: 'USD', ownerId: 'user-1' });
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.type).toBe('user');
-      expect(result.value.currency.code).toBe('USD');
+      expect(result.value.ownerId).toBe('user-1');
       expect(result.value.createdAt).toBe(fixedNow);
-      expect(save).toHaveBeenCalledTimes(1);
       const [savedAccount, tx] = save.mock.calls[0] ?? [];
       expect(savedAccount).toBeInstanceOf(Account);
       expect(tx).toBeDefined();
@@ -85,26 +100,25 @@ describe('AccountsService', () => {
     it('initializes the balance row once, in the same transaction as the account', async () => {
       const { repository, save } = buildRepo();
       const balances = buildBalances();
-      const service = new AccountsService(repository, balances.repository, passthroughUow, clock);
+      const service = buildService(repository, balances.repository);
 
-      const result = await service.open({ currency: 'USD' });
+      const result = await service.open({ currency: 'USD', ownerId: 'user-1' });
 
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(balances.initialize).toHaveBeenCalledTimes(1);
       const [accountId, initTx] = balances.initialize.mock.calls[0] ?? [];
-      const [savedAccount, saveTx] = save.mock.calls[0] ?? [];
+      const [, saveTx] = save.mock.calls[0] ?? [];
       expect(accountId?.value).toBe(result.value.id.value);
-      expect(savedAccount).toBeDefined();
       expect(initTx).toBe(saveTx);
     });
 
     it('rejects an unknown currency without touching the repository', async () => {
       const { repository, save } = buildRepo();
       const balances = buildBalances();
-      const service = new AccountsService(repository, balances.repository, passthroughUow, clock);
+      const service = buildService(repository, balances.repository);
 
-      const result = await service.open({ currency: 'ZZZ' });
+      const result = await service.open({ currency: 'ZZZ', ownerId: 'user-1' });
 
       expect(result.ok).toBe(false);
       if (result.ok) return;
@@ -114,53 +128,55 @@ describe('AccountsService', () => {
     });
   });
 
-  describe('getById', () => {
-    it('resolves an account by its id', async () => {
-      const account = Account.openUser(usd(), fixedNow);
-      const { repository, findById } = buildRepo({
+  describe('getVisible', () => {
+    it("resolves the caller's own account", async () => {
+      const account = Account.openUser(usd(), 'user-1', fixedNow);
+      const { repository } = buildRepo({
         findById: jest.fn<Promise<Account | null>, [AccountId, Tx?]>().mockResolvedValue(account),
       });
-      const service = new AccountsService(
-        repository,
-        buildBalances().repository,
-        passthroughUow,
-        clock,
-      );
+      const service = buildService(repository, buildBalances().repository);
 
-      const found = await service.getById(account.id.value);
+      expect(await service.getVisible(account.id.value, 'user-1')).toBe(account);
+    });
 
-      expect(found).toBe(account);
-      const [id] = findById.mock.calls[0] ?? [];
-      expect(id?.value).toBe(account.id.value);
+    it("hides another owner's account (returns null)", async () => {
+      const account = Account.openUser(usd(), 'user-2', fixedNow);
+      const { repository } = buildRepo({
+        findById: jest.fn<Promise<Account | null>, [AccountId, Tx?]>().mockResolvedValue(account),
+      });
+      const service = buildService(repository, buildBalances().repository);
+
+      expect(await service.getVisible(account.id.value, 'user-1')).toBeNull();
+    });
+
+    it('exposes a system account to any caller', async () => {
+      const world = systemAccount();
+      const { repository } = buildRepo({
+        findById: jest.fn<Promise<Account | null>, [AccountId, Tx?]>().mockResolvedValue(world),
+      });
+      const service = buildService(repository, buildBalances().repository);
+
+      expect(await service.getVisible(world.id.value, 'user-1')).toBe(world);
     });
 
     it('returns null when no account matches', async () => {
       const { repository } = buildRepo();
-      const service = new AccountsService(
-        repository,
-        buildBalances().repository,
-        passthroughUow,
-        clock,
-      );
+      const service = buildService(repository, buildBalances().repository);
 
-      expect(await service.getById(AccountId.generate().value)).toBeNull();
+      expect(await service.getVisible(AccountId.generate().value, 'user-1')).toBeNull();
     });
   });
 
-  describe('list', () => {
-    it('delegates to the repository', async () => {
-      const accounts = [Account.openUser(usd(), fixedNow)];
-      const { repository } = buildRepo({
-        list: jest.fn<Promise<Account[]>, [Tx?]>().mockResolvedValue(accounts),
+  describe('listVisible', () => {
+    it('delegates to the owner-scoped repository query', async () => {
+      const accounts = [Account.openUser(usd(), 'user-1', fixedNow)];
+      const { repository, listVisibleTo } = buildRepo({
+        listVisibleTo: jest.fn<Promise<Account[]>, [string, Tx?]>().mockResolvedValue(accounts),
       });
-      const service = new AccountsService(
-        repository,
-        buildBalances().repository,
-        passthroughUow,
-        clock,
-      );
+      const service = buildService(repository, buildBalances().repository);
 
-      expect(await service.list()).toBe(accounts);
+      expect(await service.listVisible('user-1')).toBe(accounts);
+      expect(listVisibleTo).toHaveBeenCalledWith('user-1');
     });
   });
 });

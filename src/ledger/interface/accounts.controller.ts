@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
 import { AccessTokenGuard } from '../../access/access-token.guard';
+import { CurrentPrincipal } from '../../access/principal.decorator';
+import { type Principal } from '../../access/principal';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AccountsService } from '../application/accounts.service';
@@ -23,8 +25,12 @@ export class AccountsController {
   @HttpCode(201)
   async open(
     @Body(new ZodValidationPipe(openAccountSchema)) body: OpenAccountDto,
+    @CurrentPrincipal() principal: Principal,
   ): Promise<AccountResponse> {
-    const result = await this.accounts.open(body);
+    const result = await this.accounts.open({
+      currency: body.currency,
+      ownerId: principal.subject,
+    });
     if (!result.ok) {
       throw new ProblemException({
         type: 'about:blank',
@@ -37,8 +43,11 @@ export class AccountsController {
   }
 
   @Get(':id')
-  async getById(@Param('id') id: string): Promise<AccountResponse> {
-    const account = await this.accounts.getById(id);
+  async getById(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<AccountResponse> {
+    const account = await this.accounts.getVisible(id, principal.subject);
     if (!account) {
       throw new ProblemException({
         type: 'about:blank',
@@ -50,8 +59,8 @@ export class AccountsController {
   }
 
   @Get()
-  async list(): Promise<AccountResponse[]> {
-    const accounts = await this.accounts.list();
+  async list(@CurrentPrincipal() principal: Principal): Promise<AccountResponse[]> {
+    const accounts = await this.accounts.listVisible(principal.subject);
     return accounts.map((account) => this.toResponse(account));
   }
 

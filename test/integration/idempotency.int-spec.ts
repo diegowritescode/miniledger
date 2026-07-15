@@ -69,7 +69,7 @@ describe('Transfer idempotency (integration)', () => {
   });
 
   const openAccount = async (): Promise<AccountId> => {
-    const account = Account.openUser(USD, new Date('2026-07-07T07:00:00.000Z'));
+    const account = Account.openUser(USD, 'owner-test', new Date('2026-07-07T07:00:00.000Z'));
     await accounts.save(account);
     await balances.initialize(account.id);
     createdAccountIds.push(account.id.value);
@@ -88,6 +88,7 @@ describe('Transfer idempotency (integration)', () => {
       to: to.value,
       amount: amount.toString(),
       currency: 'USD',
+      ownerId: 'owner-test',
     });
     if (!result.ok) throw new Error(`deposit failed: ${result.error}`);
   };
@@ -103,6 +104,7 @@ describe('Transfer idempotency (integration)', () => {
       to: b.value,
       amount: '250',
       currency: 'USD',
+      ownerId: 'owner-test',
       idempotencyKey: k,
     });
     const second = await service.transfer({
@@ -110,6 +112,7 @@ describe('Transfer idempotency (integration)', () => {
       to: b.value,
       amount: '250',
       currency: 'USD',
+      ownerId: 'owner-test',
       idempotencyKey: k,
     });
 
@@ -131,6 +134,7 @@ describe('Transfer idempotency (integration)', () => {
       to: b.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-test',
       idempotencyKey: k,
     });
     const conflict = await service.transfer({
@@ -138,6 +142,7 @@ describe('Transfer idempotency (integration)', () => {
       to: b.value,
       amount: '200',
       currency: 'USD',
+      ownerId: 'owner-test',
       idempotencyKey: k,
     });
 
@@ -159,6 +164,7 @@ describe('Transfer idempotency (integration)', () => {
         to: b.value,
         amount: '400',
         currency: 'USD',
+        ownerId: 'owner-test',
         idempotencyKey: k,
       }),
       service.transfer({
@@ -166,6 +172,7 @@ describe('Transfer idempotency (integration)', () => {
         to: b.value,
         amount: '400',
         currency: 'USD',
+        ownerId: 'owner-test',
         idempotencyKey: k,
       }),
     ]);
@@ -187,6 +194,7 @@ describe('Transfer idempotency (integration)', () => {
       to: b.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-test',
       idempotencyKey: k,
     });
     expect(failed.ok).toBe(false);
@@ -200,6 +208,7 @@ describe('Transfer idempotency (integration)', () => {
       to: b.value,
       amount: '100',
       currency: 'USD',
+      ownerId: 'owner-test',
       idempotencyKey: k,
     });
     expect(retry.ok).toBe(true);

@@ -42,7 +42,7 @@ describe('DrizzleAccountsRepository (integration)', () => {
 
   it('saves a user account and reads back an equal aggregate', async () => {
     const account = await persist(
-      Account.openUser(currency('USD'), new Date('2026-04-04T10:00:00.000Z')),
+      Account.openUser(currency('USD'), 'owner-test', new Date('2026-04-04T10:00:00.000Z')),
     );
 
     const found = await repository.findById(account.id);
@@ -54,11 +54,12 @@ describe('DrizzleAccountsRepository (integration)', () => {
     expect(found.currency.code).toBe('USD');
     expect(found.overdraftFloor).toBe(0n);
     expect(found.handle).toBeNull();
+    expect(found.ownerId).toBe('owner-test');
     expect(found.createdAt.getTime()).toBe(account.createdAt.getTime());
   });
 
   it('includes a saved account in the listing', async () => {
-    const account = await persist(Account.openUser(currency('EUR'), new Date()));
+    const account = await persist(Account.openUser(currency('EUR'), 'owner-test', new Date()));
 
     const listed = await repository.list();
 
@@ -66,9 +67,21 @@ describe('DrizzleAccountsRepository (integration)', () => {
   });
 
   it('returns null for an unknown id', async () => {
-    const missing = Account.openUser(currency('USD'), new Date());
+    const missing = Account.openUser(currency('USD'), 'owner-test', new Date());
 
     expect(await repository.findById(missing.id)).toBeNull();
+  });
+
+  it('lists accounts visible to an owner: their own plus system, not another owner', async () => {
+    const mine = await persist(Account.openUser(currency('USD'), 'owner-a', new Date()));
+    const theirs = await persist(Account.openUser(currency('USD'), 'owner-b', new Date()));
+
+    const visible = await repository.listVisibleTo('owner-a');
+    const ids = visible.map((account) => account.id.value);
+
+    expect(ids).toContain(mine.id.value);
+    expect(ids).not.toContain(theirs.id.value);
+    expect(visible.some((account) => account.isSystem())).toBe(true);
   });
 
   it.each(['USD', 'EUR', 'JPY'])(
