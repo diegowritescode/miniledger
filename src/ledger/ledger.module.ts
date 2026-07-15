@@ -11,11 +11,13 @@ import { ACCOUNTS_REPOSITORY } from './domain/ports/accounts-repository';
 import { AUDIT_REPOSITORY } from './domain/ports/audit-repository';
 import { IDEMPOTENCY_REPOSITORY } from './domain/ports/idempotency-repository';
 import { JOURNAL_TRANSACTIONS_REPOSITORY } from './domain/ports/journal-transactions-repository';
+import { OUTBOX_REPOSITORY } from './domain/ports/outbox-repository';
 import { DrizzleAccountBalancesRepository } from './infrastructure/persistence/drizzle-account-balances.repository';
 import { DrizzleAccountsRepository } from './infrastructure/persistence/drizzle-accounts.repository';
 import { DrizzleAuditRepository } from './infrastructure/persistence/drizzle-audit.repository';
 import { DrizzleIdempotencyRepository } from './infrastructure/persistence/drizzle-idempotency.repository';
 import { DrizzleJournalTransactionsRepository } from './infrastructure/persistence/drizzle-journal-transactions.repository';
+import { DrizzleOutboxRepository } from './infrastructure/persistence/drizzle-outbox.repository';
 import { AccountsController } from './interface/accounts.controller';
 import { AuditController } from './interface/audit.controller';
 import { TransfersController } from './interface/transfers.controller';
@@ -44,6 +46,11 @@ import { TransfersController } from './interface/transfers.controller';
       inject: [DB],
       useFactory: (db: Database): DrizzleJournalTransactionsRepository =>
         new DrizzleJournalTransactionsRepository(db),
+    },
+    {
+      provide: OUTBOX_REPOSITORY,
+      inject: [DB],
+      useFactory: (db: Database): DrizzleOutboxRepository => new DrizzleOutboxRepository(db),
     },
     {
       provide: IDEMPOTENCY_REPOSITORY,

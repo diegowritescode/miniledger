@@ -10,6 +10,7 @@ import { DrizzleAccountsRepository } from '../../src/ledger/infrastructure/persi
 import { DrizzleAuditRepository } from '../../src/ledger/infrastructure/persistence/drizzle-audit.repository';
 import { DrizzleIdempotencyRepository } from '../../src/ledger/infrastructure/persistence/drizzle-idempotency.repository';
 import { DrizzleJournalTransactionsRepository } from '../../src/ledger/infrastructure/persistence/drizzle-journal-transactions.repository';
+import { DrizzleOutboxRepository } from '../../src/ledger/infrastructure/persistence/drizzle-outbox.repository';
 import { Currency } from '../../src/shared/kernel/currency';
 
 const DATABASE_URL =
@@ -30,7 +31,14 @@ describe('Audit verifier (integration)', () => {
   const idempotency = new DrizzleIdempotencyRepository(db);
   const auditRepo = new DrizzleAuditRepository(db);
   const uow = new DrizzleUnitOfWork(db);
-  const transfers = new TransferService(accounts, balances, journals, idempotency, uow);
+  const transfers = new TransferService(
+    accounts,
+    balances,
+    journals,
+    idempotency,
+    new DrizzleOutboxRepository(db),
+    uow,
+  );
   const audit = new AuditService(accounts, auditRepo);
 
   const createdAccountIds: string[] = [];

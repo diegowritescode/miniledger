@@ -57,6 +57,13 @@
       "when": 1784087665289,
       "tag": "0007_late_susan_delgado",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784092286297,
+      "tag": "0008_narrow_black_tarantula",
+      "breakpoints": true
     }
   ]
 }
