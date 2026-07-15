@@ -1,12 +1,31 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  type AnyPgColumn,
+  bigint,
+  check,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { accounts } from './accounts.schema';
 
-export const journalTransactions = pgTable('journal_transactions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  currency: text('currency').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const journalTransactions = pgTable(
+  'journal_transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    currency: text('currency').notNull(),
+    reversesTransactionId: uuid('reverses_transaction_id').references(
+      (): AnyPgColumn => journalTransactions.id,
+    ),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('journal_transactions_reverses_transaction_id_key').on(table.reversesTransactionId),
+  ],
+);
 
 export const postings = pgTable(
   'postings',

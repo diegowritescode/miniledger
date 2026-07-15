@@ -79,11 +79,12 @@ withdrawals, refunds, and reversals are the same primitive with different legs. 
 
 ### `journal_transactions`
 
-| Column       | Type          | Null | Default             | Notes                                       |
-| ------------ | ------------- | ---- | ------------------- | ------------------------------------------- |
-| `id`         | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                |
-| `currency`   | `text`        | no   | —                   | The single currency shared by all its legs. |
-| `created_at` | `timestamptz` | no   | `now()`             | Creation instant.                           |
+| Column                    | Type          | Null | Default             | Notes                                                                                                        |
+| ------------------------- | ------------- | ---- | ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `id`                      | `uuid`        | no   | `gen_random_uuid()` | Primary key.                                                                                                 |
+| `currency`                | `text`        | no   | —                   | The single currency shared by all its legs.                                                                  |
+| `reverses_transaction_id` | `uuid`        | yes  | —                   | Self-FK → `journal_transactions(id)`; set on a compensating entry, `NULL` otherwise. **Unique** (see below). |
+| `created_at`              | `timestamptz` | no   | `now()`             | Creation instant.                                                                                            |
 
 ### `postings`
 
@@ -141,6 +142,13 @@ row↔domain boundary.
   independent representations that must agree ([ADR-006](adr/006-concurrency-safe-balances.md)),
   giving the audit path a continuous consistency check. The write path that maintains this equality
   under concurrency (ordered `FOR UPDATE`) lands with the transfer use case.
+- **A transaction is reversed at most once.** A reversal is a new balanced transaction whose legs
+  negate the original's ([ADR-005](adr/005-double-entry-model.md) §4); it records the original's id
+  in `reverses_transaction_id`. A **`UNIQUE` constraint on that column**
+  (`journal_transactions_reverses_transaction_id_key`) makes a second reversal of the same
+  transaction impossible — the duplicate insert raises a unique violation the reversal path maps to
+  `409 already_reversed`. Because the column is nullable and Postgres treats `NULL`s as distinct, the
+  constraint only binds the compensating entries and never restricts ordinary transactions.
 
 ## Account balances
 
@@ -212,17 +220,18 @@ A later relay (the EventBridge spine project) publishes unpublished rows and sta
 Schema evolves through generated, reviewable SQL migrations (`drizzle-kit generate`), applied in
 every environment by the lean `drizzle-orm` runtime migrator ([ADR-003](adr/003-persistence-and-orm.md)).
 
-| Migration                     | Purpose                                                                                                                               |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `0000_solid_cammi`            | `app_meta` bootstrap table.                                                                                                           |
-| `0001_round_dexter_bennett`   | `accounts` table, the `type` check, and the partial unique index.                                                                     |
-| `0002_seed_world_accounts`    | Seeds one `@world` system account per supported currency (USD/EUR/JPY).                                                               |
-| `0003_broad_rocket_raccoon`   | `journal_transactions`, `postings` (FKs, indexes, `amount <> 0` check), and `account_balances` tables.                                |
-| `0004_ledger_invariants`      | Custom SQL: the deferred sum-zero constraint trigger, `REVOKE UPDATE, DELETE ON postings`, and the idempotent balance backfill.       |
-| `0005_colossal_whizzer`       | `idempotency_keys` table (FK → `journal_transactions`).                                                                               |
-| `0006_sour_zaran`             | Per-account hash chain: `postings.seq`/`prev_hash`/`hash` and `account_balances.chain_hash` ([ADR-008](adr/008-audit-hash-chain.md)). |
-| `0007_late_susan_delgado`     | `accounts.owner_id` + its index for local ownership ([ADR-009](adr/009-accesscore-integration.md)).                                   |
-| `0008_narrow_black_tarantula` | `outbox` table for the transactional outbox ([ADR-010](adr/010-transactional-outbox.md)).                                             |
+| Migration                     | Purpose                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0000_solid_cammi`            | `app_meta` bootstrap table.                                                                                                                    |
+| `0001_round_dexter_bennett`   | `accounts` table, the `type` check, and the partial unique index.                                                                              |
+| `0002_seed_world_accounts`    | Seeds one `@world` system account per supported currency (USD/EUR/JPY).                                                                        |
+| `0003_broad_rocket_raccoon`   | `journal_transactions`, `postings` (FKs, indexes, `amount <> 0` check), and `account_balances` tables.                                         |
+| `0004_ledger_invariants`      | Custom SQL: the deferred sum-zero constraint trigger, `REVOKE UPDATE, DELETE ON postings`, and the idempotent balance backfill.                |
+| `0005_colossal_whizzer`       | `idempotency_keys` table (FK → `journal_transactions`).                                                                                        |
+| `0006_sour_zaran`             | Per-account hash chain: `postings.seq`/`prev_hash`/`hash` and `account_balances.chain_hash` ([ADR-008](adr/008-audit-hash-chain.md)).          |
+| `0007_late_susan_delgado`     | `accounts.owner_id` + its index for local ownership ([ADR-009](adr/009-accesscore-integration.md)).                                            |
+| `0008_narrow_black_tarantula` | `outbox` table for the transactional outbox ([ADR-010](adr/010-transactional-outbox.md)).                                                      |
+| `0009_tan_wendell_vaughn`     | `journal_transactions.reverses_transaction_id` (self-FK) + its `UNIQUE` constraint for reversal ([ADR-005](adr/005-double-entry-model.md) §4). |
 
 The `@world` seed is **idempotent** — each insert is guarded by
 `WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE handle = '@world' AND currency = …)` — so applying

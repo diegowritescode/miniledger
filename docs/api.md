@@ -12,8 +12,8 @@
   The token is an AccessCore EdDSA access token, verified offline
   ([security.md](security.md#authentication)). Missing/invalid → **401**.
 - **Authorization** — privileged routes also require an AccessCore capability
-  (`ledger.open`/`ledger.transfer`/`ledger.audit`) plus, where applicable, local account ownership
-  ([security.md](security.md#authorization)).
+  (`ledger.open`/`ledger.transfer`/`ledger.reverse`/`ledger.audit`) plus, where applicable, local
+  account ownership ([security.md](security.md#authorization)).
 - **Errors** — **RFC 7807** `application/problem+json`: `{ "type", "title", "status", "detail" }`.
 - **Versioning / pagination** — the surface is small and unversioned; list endpoints are unpaged
   (owner-scoped). Both are candidates if the surface grows.
@@ -121,6 +121,36 @@ No auth. Runs a `SELECT 1` DB probe. `200 { "status": "ready" }` when Postgres i
   | `409`  | `Idempotency-Key` reused with a **different** request body (`idempotency_conflict`)                         |
   | `422`  | insufficient funds; non-positive amount; same source and destination; currency mismatch; validation failure |
   | `503`  | AccessCore PDP unavailable (**fail-closed**)                                                                |
+
+### `POST /reversals` — reverse (compensate) a transaction
+
+- **Auth:** Bearer + capability `ledger.reverse`. Reversal is **capability-gated, not
+  ownership-gated** — it posts a compensating entry through the same locked path as a transfer but
+  skips the source-ownership check, so an authorized operator can reverse any transaction (including
+  a deposit from `@world`).
+- **Behavior:** loads the original transaction and posts a **new balanced transaction whose legs are
+  the original's negated** ([ADR-005](adr/005-double-entry-model.md) §4). History is never mutated;
+  the compensating entry records the original's id in `reverses_transaction_id`, and a
+  `transfer.reversed` event is written to the outbox in the same transaction
+  ([ADR-010](adr/010-transactional-outbox.md)).
+- **Request:**
+
+  ```json
+  { "transactionId": "c1a2b3d4-e5f6-7081-92a3-b4c5d6e7f8a9" }
+  ```
+
+- **Success:** `201 Created` — a receipt in the same shape as a transfer, with the compensating
+  (negated) legs and each account's `balanceAfter` after the reversal.
+- **Errors (RFC 7807):**
+
+  | Status | Condition                                                                                                           |
+  | ------ | ------------------------------------------------------------------------------------------------------------------- |
+  | `401`  | unauthenticated                                                                                                     |
+  | `403`  | capability denied                                                                                                   |
+  | `404`  | the transaction does not exist (`unknown_transaction`)                                                              |
+  | `409`  | the transaction has already been reversed (`already_reversed` — the `UNIQUE` reversal constraint)                   |
+  | `422`  | the reversal would overdraw an account whose funds were already moved on (`insufficient_funds`); validation failure |
+  | `503`  | AccessCore PDP unavailable (**fail-closed**)                                                                        |
 
 ### `GET /audit/accounts/:id` — verify one account
 

@@ -64,6 +64,13 @@
       "when": 1784092286297,
       "tag": "0008_narrow_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784156326115,
+      "tag": "0009_tan_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }

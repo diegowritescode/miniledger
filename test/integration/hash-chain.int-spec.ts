@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DrizzleUnitOfWork } from '../../src/db/drizzle-unit-of-work';
+import { LedgerPoster } from '../../src/ledger/application/ledger-poster';
 import { TransferService } from '../../src/ledger/application/transfer.service';
 import { Account } from '../../src/ledger/domain/account';
 import { type AccountId } from '../../src/ledger/domain/account-id';
@@ -39,14 +40,8 @@ describe('Posting hash chain (integration)', () => {
   const journals = new DrizzleJournalTransactionsRepository(db);
   const idempotency = new DrizzleIdempotencyRepository(db);
   const uow = new DrizzleUnitOfWork(db);
-  const service = new TransferService(
-    accounts,
-    balances,
-    journals,
-    idempotency,
-    new DrizzleOutboxRepository(db),
-    uow,
-  );
+  const poster = new LedgerPoster(accounts, balances, journals, new DrizzleOutboxRepository(db));
+  const service = new TransferService(poster, idempotency, uow);
 
   const createdAccountIds: string[] = [];
   let worldUsd: AccountId;

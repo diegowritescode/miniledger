@@ -5,6 +5,8 @@ import { CLOCK } from '../shared/kernel/clock';
 import { SystemClock } from '../shared/kernel/system-clock';
 import { AccountsService } from './application/accounts.service';
 import { AuditService } from './application/audit.service';
+import { LedgerPoster } from './application/ledger-poster';
+import { ReverseService } from './application/reverse.service';
 import { TransferService } from './application/transfer.service';
 import { ACCOUNT_BALANCES_REPOSITORY } from './domain/ports/account-balances-repository';
 import { ACCOUNTS_REPOSITORY } from './domain/ports/accounts-repository';
@@ -20,14 +22,17 @@ import { DrizzleJournalTransactionsRepository } from './infrastructure/persisten
 import { DrizzleOutboxRepository } from './infrastructure/persistence/drizzle-outbox.repository';
 import { AccountsController } from './interface/accounts.controller';
 import { AuditController } from './interface/audit.controller';
+import { ReversalsController } from './interface/reversals.controller';
 import { TransfersController } from './interface/transfers.controller';
 
 @Module({
   imports: [AccessModule],
-  controllers: [AccountsController, TransfersController, AuditController],
+  controllers: [AccountsController, TransfersController, ReversalsController, AuditController],
   providers: [
     AccountsService,
+    LedgerPoster,
     TransferService,
+    ReverseService,
     AuditService,
     { provide: CLOCK, useClass: SystemClock },
     {
