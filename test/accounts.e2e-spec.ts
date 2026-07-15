@@ -2,9 +2,11 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
+import { ACCESS_CORE_CLIENT } from '@diegowritescode/accesscore-sdk';
 import { AppModule } from '../src/app.module';
 import { JWKS_RESOLVER } from '../src/access/jwks-resolver';
 import { createAccessTestKit } from './support/access';
+import { createPepStub } from './support/pep';
 
 interface AccountResponse {
   id: string;
@@ -27,6 +29,8 @@ describe('Accounts (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(JWKS_RESOLVER)
       .useValue(kit.jwksResolver)
+      .overrideProvider(ACCESS_CORE_CLIENT)
+      .useValue(createPepStub().client)
       .compile();
     app = moduleRef.createNestApplication();
     await app.init();

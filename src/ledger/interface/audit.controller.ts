@@ -1,4 +1,5 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { ProblemException } from '../../shared/http/problem-details';
 import { AuditService } from '../application/audit.service';
@@ -24,6 +25,7 @@ export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
   @Get('accounts/:id')
+  @RequirePermission('ledger.audit', () => ({ type: 'ledger', id: 'miniledger' }))
   async verifyAccount(@Param('id') id: string): Promise<AccountAuditResponse> {
     const result = await this.audit.verifyAccount(id);
     if (!result.ok) {
@@ -47,6 +49,7 @@ export class AuditController {
   }
 
   @Get('conservation')
+  @RequirePermission('ledger.audit', () => ({ type: 'ledger', id: 'miniledger' }))
   async verifyConservation(): Promise<ConservationResponse> {
     const report = await this.audit.verifyConservation();
     return {
