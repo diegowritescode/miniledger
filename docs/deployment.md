@@ -80,6 +80,9 @@ an invalid environment fails fast. See [`.env.example`](../.env.example).
 | `ACCESSCORE_JWT_AUDIENCE`       | `accesscore`                                  | Required `aud` claim.                                  |
 | `ACCESSCORE_CLOCK_SKEW_SECONDS` | `30`                                          | Allowed `exp`/`nbf` skew.                              |
 | `ACCESSCORE_CHECK_TIMEOUT_MS`   | `3000`                                        | PEP `check()` timeout (a slow PDP fails closed → 503). |
+| `LOG_LEVEL`                     | `info`                                        | pino log level (`fatal`…`trace`, or `silent`).         |
+| `THROTTLE_TTL_SECONDS`          | `60`                                          | Rate-limit window length.                              |
+| `THROTTLE_LIMIT`                | `100`                                         | Max requests per window per client.                    |
 
 `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` configure the compose Postgres. No secret is ever
 committed; the real `.env` is git-ignored.

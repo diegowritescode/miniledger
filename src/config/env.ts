@@ -11,6 +11,8 @@ export const envSchema = z.object({
   ACCESSCORE_JWT_AUDIENCE: z.string().min(1).default('accesscore'),
   ACCESSCORE_CLOCK_SKEW_SECONDS: z.coerce.number().int().nonnegative().default(30),
   ACCESSCORE_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  THROTTLE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 });
 
 export type Env = z.infer<typeof envSchema>;

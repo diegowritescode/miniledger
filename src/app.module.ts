@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import type { Env } from './config/env';
 import { ENV, EnvModule } from './config/env.module';
@@ -37,11 +38,21 @@ import { ProblemDetailsFilter } from './shared/http/problem-details.filter';
         },
       }),
     }),
+    ThrottlerModule.forRootAsync({
+      inject: [ENV],
+      useFactory: (env: Env) => ({
+        throttlers: [{ ttl: env.THROTTLE_TTL_SECONDS * 1000, limit: env.THROTTLE_LIMIT }],
+        skipIf: () => env.NODE_ENV === 'test',
+      }),
+    }),
     DbModule,
     HealthModule,
     LedgerModule,
     MetricsModule,
   ],
-  providers: [{ provide: APP_FILTER, useClass: ProblemDetailsFilter }],
+  providers: [
+    { provide: APP_FILTER, useClass: ProblemDetailsFilter },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

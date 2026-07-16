@@ -135,6 +135,14 @@ by a global `ProblemDetailsFilter`. Error responses never include stack traces o
   **public** JWKS, so MiniLedger holds no signing key — there is no token secret to leak.
 - `helmet` sets baseline security headers; the JSON body is capped at 32 kB.
 
+## Rate limiting
+
+A global `ThrottlerGuard` caps requests per client to `THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`
+(default 100 / 60 s); over the cap returns **429** as RFC 7807. Liveness/readiness (`/health`,
+`/ready`) and metrics scraping (`/metrics`) are exempt (`@SkipThrottle`) so probes and Prometheus are
+never throttled. The counter is **in-memory**, which is correct for the single-instance deployment;
+running multiple replicas would need a shared store (Redis) so the limit is enforced across them.
+
 ## Threats considered (OWASP)
 
 | Threat                              | Mitigation                                                                                                              |
