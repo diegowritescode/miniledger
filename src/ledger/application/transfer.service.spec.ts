@@ -69,7 +69,6 @@ const build = (accounts: Account[], locked: Map<string, bigint>, options: Option
     save: jest.fn(),
     findById,
     findByHandle: jest.fn(),
-    list: jest.fn(),
     listVisibleTo: jest.fn(),
   };
 

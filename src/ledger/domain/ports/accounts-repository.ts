@@ -7,7 +7,6 @@ export interface AccountsRepository {
   save(account: Account, tx?: Tx): Promise<void>;
   findById(id: AccountId, tx?: Tx): Promise<Account | null>;
   findByHandle(handle: string, currency: Currency, tx?: Tx): Promise<Account | null>;
-  list(tx?: Tx): Promise<Account[]>;
   listVisibleTo(ownerId: string, tx?: Tx): Promise<Account[]>;
 }
 

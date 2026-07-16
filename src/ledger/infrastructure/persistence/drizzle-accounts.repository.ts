@@ -40,11 +40,6 @@ export class DrizzleAccountsRepository implements AccountsRepository {
     return row ? this.toDomain(row) : null;
   }
 
-  async list(tx?: Tx): Promise<Account[]> {
-    const rows = await this.executor(tx).select().from(accounts);
-    return rows.map((row) => this.toDomain(row));
-  }
-
   async listVisibleTo(ownerId: string, tx?: Tx): Promise<Account[]> {
     const rows = await this.executor(tx)
       .select()
