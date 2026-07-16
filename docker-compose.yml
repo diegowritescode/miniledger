@@ -15,5 +15,24 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-miniledger}:${POSTGRES_PASSWORD:-miniledger}@postgres:5432/${POSTGRES_DB:-miniledger}
+      ACCESSCORE_BASE_URL: ${ACCESSCORE_BASE_URL:-http://localhost:3001}
+      ACCESSCORE_JWKS_URL: ${ACCESSCORE_JWKS_URL:-http://localhost:3001/.well-known/jwks.json}
+      ACCESSCORE_JWT_ISSUER: ${ACCESSCORE_JWT_ISSUER:-https://auth.accesscore.dev}
+      ACCESSCORE_JWT_AUDIENCE: ${ACCESSCORE_JWT_AUDIENCE:-accesscore}
+      ACCESSCORE_CLOCK_SKEW_SECONDS: ${ACCESSCORE_CLOCK_SKEW_SECONDS:-30}
+      ACCESSCORE_CHECK_TIMEOUT_MS: ${ACCESSCORE_CHECK_TIMEOUT_MS:-3000}
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+
 volumes:
   pgdata:

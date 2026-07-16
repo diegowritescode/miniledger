@@ -47,9 +47,8 @@ const buildRepo = (
     jest.fn<Promise<Account | null>, [AccountId, Tx?]>().mockResolvedValue(null);
   const listVisibleTo =
     overrides.listVisibleTo ?? jest.fn<Promise<Account[]>, [string, Tx?]>().mockResolvedValue([]);
-  const list = jest.fn<Promise<Account[]>, [Tx?]>().mockResolvedValue([]);
   const findByHandle = jest.fn().mockResolvedValue(null);
-  const repository: AccountsRepository = { save, findById, findByHandle, list, listVisibleTo };
+  const repository: AccountsRepository = { save, findById, findByHandle, listVisibleTo };
   return { repository, save, findById, listVisibleTo };
 };
 

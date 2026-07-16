@@ -7,27 +7,29 @@ clone runs with nothing more than a database.
 
 ## Environments
 
-| Environment    | What differs                                                                                                                                 |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Local dev**  | Postgres via `docker compose` on **host port 5433**; app run with `npm run start:dev`. `ACCESSCORE_*` point at a local or shared AccessCore. |
-| **CI**         | Postgres **service container** on `5432`; migrations applied with `drizzle-kit`; the merged coverage gate runs.                              |
-| **Production** | The runtime Docker image; `migrate-on-start` applies pending migrations, then boots the API. **Live: TBD.**                                  |
+| Environment    | What differs                                                                                                                                                                                                                            |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local dev**  | Postgres via `docker compose` on **host port 5433**; app run with `npm run start:dev`. `ACCESSCORE_*` point at a local or shared AccessCore.                                                                                            |
+| **CI**         | Postgres **service container** on `5432`; migrations applied with `drizzle-kit`; the merged coverage gate runs.                                                                                                                         |
+| **Production** | Runs on **Dokploy** at **`https://ledger.deviego.xyz`** from the runtime image against a Dokploy-managed Postgres; `migrate-on-start` applies pending migrations, then boots the API. See [Production — Dokploy](#production--dokploy). |
 
 ## Local run
 
 ```bash
 cp .env.example .env
-docker compose up -d       # starts PostgreSQL on host port 5433 (see docker-compose.yml)
-npm ci                     # installs deps incl. the AccessCore SDK from public npmjs (no token)
-npm run db:migrate         # apply migrations to the running database
+docker compose up -d postgres   # starts PostgreSQL on host port 5433 (see docker-compose.yml)
+npm ci                          # installs deps incl. the AccessCore SDK from public npmjs (no token)
+npm run db:migrate              # apply migrations to the running database
 npm run start:dev
 ```
 
-`docker-compose.yml` currently provisions **PostgreSQL only** (`postgres:16-alpine`, host
-`5433` → container `5432`, with a `pg_isready` healthcheck and a named volume). The app is run from
-the host in dev, or from the Docker image in production. Redis and RabbitMQ are **not** used yet —
-idempotency is Postgres-authoritative ([ADR-007](adr/007-idempotency.md)) and messaging arrives with
-the EventBridge spine project.
+`docker-compose.yml` provisions **PostgreSQL** (`postgres:16-alpine`, host `5433` → container `5432`,
+with a `pg_isready` healthcheck and a named volume) **and the API** (built from the `Dockerfile`, gated
+on a healthy database, migrate-on-start, served on `:3000`). A bare `docker compose up` therefore boots
+the **whole stack** from a clean clone; for hot-reload development, start Postgres only
+(`docker compose up -d postgres`) and run the app with `npm run start:dev`. Redis and RabbitMQ are
+**not** used yet — idempotency is Postgres-authoritative ([ADR-007](adr/007-idempotency.md)) and
+messaging arrives with the EventBridge spine project.
 
 ## Docker image
 
@@ -94,6 +96,39 @@ npm **Trusted Publishing (OIDC)** from AccessCore's CI — classic/automation to
 per AccessCore
 [ADR-017](https://github.com/diegowritescode/accesscore/blob/main/docs/adr/017-sdk-packaging-and-publishing.md).
 
+## Production — Dokploy
+
+MiniLedger runs on [Dokploy](https://dokploy.com/) at **`https://ledger.deviego.xyz`**, deployed from
+this GitHub repository with a **managed Postgres** service (app and data have independent lifecycles).
+
+1. **Database** — create a **PostgreSQL** service in Dokploy. Note its internal connection string; it
+   becomes the app's `DATABASE_URL`.
+2. **Application** — create an **Application** from the `diegowritescode/miniledger` repo, **Docker
+   (Dockerfile)** build. The image applies migrations on start (`node dist/migrate.js`) before booting,
+   so the first deploy provisions the schema with no manual step.
+3. **Environment** — set the variables below. No AccessCore service credential is needed: the PEP
+   **forwards the caller's own access token** to AccessCore on each `check()`
+   (`@diegowritescode/accesscore-sdk`), so `ACCESSCORE_BASE_URL` is the only integration wiring.
+4. **Domain** — map **`ledger.deviego.xyz`** to the app on container port **3000** with Dokploy's
+   Traefik TLS. The app sets `trust proxy`, so it honours the proxy's `X-Forwarded-*`.
+5. **Deploy** — trigger the build. Verify `GET /health` and `GET /ready` return `200`.
+
+| Variable                        | Production value                                 | Notes                                                     |
+| ------------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
+| `NODE_ENV`                      | `production`                                     |                                                           |
+| `PORT`                          | `3000`                                           | Container port mapped by the Dokploy domain.              |
+| `DATABASE_URL`                  | _(from the Dokploy Postgres service)_            | Managed Postgres connection string.                       |
+| `ACCESSCORE_BASE_URL`           | `https://auth.deviego.xyz`                       | Live AccessCore; the PEP forwards `check()` here.         |
+| `ACCESSCORE_JWKS_URL`           | `https://auth.deviego.xyz/.well-known/jwks.json` | Offline token verification (Ed25519/EdDSA).               |
+| `ACCESSCORE_JWT_ISSUER`         | `https://auth.accesscore.dev`                    | Must equal the deployed AccessCore's `iss` (its default). |
+| `ACCESSCORE_JWT_AUDIENCE`       | `accesscore`                                     | Must equal the deployed AccessCore's `aud` (its default). |
+| `ACCESSCORE_CLOCK_SKEW_SECONDS` | `30`                                             | Allowed `exp`/`nbf` skew.                                 |
+| `ACCESSCORE_CHECK_TIMEOUT_MS`   | `3000`                                           | PEP `check()` timeout — a slow PDP fails closed → 503.    |
+
+> `ACCESSCORE_JWT_ISSUER`/`ACCESSCORE_JWT_AUDIENCE` are AccessCore's own defaults; override them only if
+> that deployment overrode `JWT_ISSUER`/`JWT_AUDIENCE`. A protected call also requires the caller's
+> subject to hold the matching `ledger.*` permission in AccessCore on `{type: "ledger", id: "miniledger"}`.
+
 ## Rollback & observability
 
 - **Rollback** — deploy the previous image tag. Migrations are **additive/forward-only** (append-only
@@ -106,8 +141,8 @@ per AccessCore
 
 ## Deferred hardening
 
-- **LIVE public URL** — a later slice (**TBD**).
 - **Least-privilege DB role** — run the app as a non-owner role holding only `INSERT`/`SELECT` on
   `postings`, so `REVOKE UPDATE, DELETE` bites at runtime ([ADR-008](adr/008-audit-hash-chain.md),
   [data-model.md](data-model.md)).
-- **App container in compose / Nginx + TLS** — the compose file provisions Postgres only today.
+- **Metrics & tracing** — structured startup logging today; Prometheus/OpenTelemetry are a later
+  observability item.

@@ -68,7 +68,6 @@ const build = (options: Options): AuditService => {
   const accounts: AccountsRepository = {
     save: jest.fn(),
     findByHandle: jest.fn(),
-    list: jest.fn(),
     listVisibleTo: jest.fn(),
     findById: jest.fn().mockResolvedValue(options.account ?? null),
   };

@@ -58,14 +58,6 @@ describe('DrizzleAccountsRepository (integration)', () => {
     expect(found.createdAt.getTime()).toBe(account.createdAt.getTime());
   });
 
-  it('includes a saved account in the listing', async () => {
-    const account = await persist(Account.openUser(currency('EUR'), 'owner-test', new Date()));
-
-    const listed = await repository.list();
-
-    expect(listed.some((candidate) => candidate.id.equals(account.id))).toBe(true);
-  });
-
   it('returns null for an unknown id', async () => {
     const missing = Account.openUser(currency('USD'), 'owner-test', new Date());
 
