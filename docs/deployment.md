@@ -101,8 +101,10 @@ per AccessCore
 MiniLedger runs on [Dokploy](https://dokploy.com/) at **`https://ledger.deviego.xyz`**, deployed from
 this GitHub repository with a **managed Postgres** service (app and data have independent lifecycles).
 
-1. **Database** — create a **PostgreSQL** service in Dokploy. Note its internal connection string; it
-   becomes the app's `DATABASE_URL`.
+1. **Database** — create a **PostgreSQL** service in Dokploy; its owner connection string becomes
+   `MIGRATION_DATABASE_URL`. Then create the least-privilege runtime role once ([ADR-011](adr/011-least-privilege-db-role.md)):
+   `CREATE ROLE miniledger_app LOGIN PASSWORD '<strong-password>';` — its connection string becomes
+   `DATABASE_URL`. Migration 0010 grants that role the minimum on the first migrate.
 2. **Application** — create an **Application** from the `diegowritescode/miniledger` repo, **Docker
    (Dockerfile)** build. The image applies migrations on start (`node dist/migrate.js`) before booting,
    so the first deploy provisions the schema with no manual step.
@@ -117,7 +119,8 @@ this GitHub repository with a **managed Postgres** service (app and data have in
 | ------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
 | `NODE_ENV`                      | `production`                                     |                                                        |
 | `PORT`                          | `3000`                                           | Container port mapped by the Dokploy domain.           |
-| `DATABASE_URL`                  | _(from the Dokploy Postgres service)_            | Managed Postgres connection string.                    |
+| `DATABASE_URL`                  | _(the `miniledger_app` role)_                    | Least-privilege runtime role (ADR-011).                |
+| `MIGRATION_DATABASE_URL`        | _(the owner role)_                               | Runs DDL migrations; falls back to `DATABASE_URL`.     |
 | `ACCESSCORE_BASE_URL`           | `https://auth.deviego.xyz`                       | Live AccessCore; the PEP forwards `check()` here.      |
 | `ACCESSCORE_JWKS_URL`           | `https://auth.deviego.xyz/.well-known/jwks.json` | Offline token verification (Ed25519/EdDSA).            |
 | `ACCESSCORE_JWT_ISSUER`         | `https://auth.deviego.xyz`                       | Must equal the deployed AccessCore's `iss` claim.      |
@@ -142,8 +145,5 @@ this GitHub repository with a **managed Postgres** service (app and data have in
 
 ## Deferred hardening
 
-- **Least-privilege DB role** — run the app as a non-owner role holding only `INSERT`/`SELECT` on
-  `postings`, so `REVOKE UPDATE, DELETE` bites at runtime ([ADR-008](adr/008-audit-hash-chain.md),
-  [data-model.md](data-model.md)).
 - **Metrics & tracing** — structured startup logging today; Prometheus/OpenTelemetry are a later
   observability item.

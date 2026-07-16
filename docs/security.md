@@ -100,9 +100,12 @@ History is protected in three layers ([ADR-005](adr/005-double-entry-model.md),
 1. **Append-only by design** — there are no `UPDATE`/`DELETE` code paths for postings; correction
    is always a new compensating entry.
 2. **Append-only by privilege** — the migration issues `REVOKE UPDATE, DELETE ON postings FROM
-PUBLIC` so even a direct SQL statement cannot mutate recorded history. (A table's **owner
-   bypasses** grants; the intended hardening is to run the app as a dedicated least-privilege role
-   holding only `INSERT`/`SELECT` on `postings` — a documented deployment step.)
+PUBLIC`, and the application connects as the **least-privilege `miniledger_app` role**
+   ([ADR-011](adr/011-least-privilege-db-role.md)) holding only `SELECT`/`INSERT` on `postings` and
+   `journal_transactions` — so even a direct SQL statement from the running app cannot mutate recorded
+   history. A table's owner bypasses grants, so DDL migrations run as the owner over a separate
+   connection while the app never does; an integration test proves the runtime role is refused
+   (`42501`) on `UPDATE`/`DELETE`.
 3. **Tamper-evident by hash chain** — each posting stores `prev_hash` and
    `hash = sha256(prev_hash ‖ transaction_id ‖ account_id ‖ amount ‖ balance_after)`, advanced under
    the same `FOR UPDATE` balance lock the transfer already holds (one chain **per account**, so
