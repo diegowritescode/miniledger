@@ -66,7 +66,40 @@ No auth. Runs a `SELECT 1` DB probe. `200 { "status": "ready" }` when Postgres i
   (existence is not leaked — see [anti-IDOR](security.md#ownership-check--local-per-resource-anti-idor)).
 
 > The account object carries metadata, not the live balance. Balances surface on transfer receipts
-> (`balanceAfter`) and in the audit report (`GET /audit/accounts/:id`).
+> (`balanceAfter`), on the statement below, and in the audit report (`GET /audit/accounts/:id`).
+
+### `GET /accounts/:id/statement` — paginated posting history
+
+- **Auth:** Bearer (owner-scoped like `GET /accounts/:id`).
+- **Query:** `limit` (1–200, default 50) and `cursor` (a `seq`); returns the account's postings in
+  `seq` order after the cursor.
+- **Success:** `200`
+
+  ```json
+  {
+    "entries": [
+      {
+        "seq": 12,
+        "transactionId": "…",
+        "amount": "1000",
+        "balanceAfter": "1000",
+        "createdAt": "…Z"
+      },
+      {
+        "seq": 15,
+        "transactionId": "…",
+        "amount": "-300",
+        "balanceAfter": "700",
+        "createdAt": "…Z"
+      }
+    ],
+    "nextCursor": 15
+  }
+  ```
+
+  `nextCursor` is the `seq` to pass as `cursor` for the next page, or `null` on the last page.
+
+- **Errors:** `401` · **`404`** when the account does not exist or the caller is not the owner.
 
 ### `POST /transfers` — move money between accounts
 

@@ -4,15 +4,16 @@ The schema is the final arbiter of correctness in MiniLedger: money invariants a
 the database, not only by application code ([ADR-003](adr/003-persistence-and-orm.md)). This
 document tracks the tables as they land, slice by slice.
 
-Currently modelled: **`accounts`** (the `Account` aggregate and the `@world` system account), the
-**`journal_transactions`** and append-only **`postings`** tables that record double-entry history,
-and the materialized **`account_balances`** table. The correctness-critical SQL of the double-entry
-model is in place: the row-level `CHECK (amount <> 0)` and the **deferred sum-zero constraint
-trigger** ([ADR-005](adr/005-double-entry-model.md)), plus append-only enforcement via `REVOKE`.
-The concurrency-safe write path — the ordered `SELECT … FOR UPDATE` on `account_balances`, the
-overdraft guard, and the balance `UPDATE` that keeps the materialized row in step with the postings
-([ADR-006](adr/006-concurrency-safe-balances.md)) — is exercised by the transfer use case in a
-later slice; this slice provides the schema, the invariants, and the repositories that path builds on.
+The tables: **`accounts`** (the `Account` aggregate and the `@world` system account), the
+**`journal_transactions`** and append-only **`postings`** tables that record double-entry history
+(a posting links to the original it reverses via `journal_transactions.reverses_transaction_id`),
+the materialized **`account_balances`** table, the **`idempotency_keys`** table, and the **`outbox`**
+of domain events. The correctness-critical SQL is enforced by the database: the row-level
+`CHECK (amount <> 0)` and the **deferred sum-zero constraint trigger** ([ADR-005](adr/005-double-entry-model.md)),
+append-only enforcement via `REVOKE`, and the concurrency-safe write path — the ordered
+`SELECT … FOR UPDATE` on `account_balances`, the overdraft guard, and the balance `UPDATE` kept in
+step with the postings ([ADR-006](adr/006-concurrency-safe-balances.md)). Each posting also carries
+a per-account hash-chain link ([ADR-008](adr/008-audit-hash-chain.md)).
 
 ## Accounts
 

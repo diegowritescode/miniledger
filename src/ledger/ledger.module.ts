@@ -7,6 +7,7 @@ import { AccountsService } from './application/accounts.service';
 import { AuditService } from './application/audit.service';
 import { LedgerPoster } from './application/ledger-poster';
 import { ReverseService } from './application/reverse.service';
+import { StatementService } from './application/statement.service';
 import { TransferService } from './application/transfer.service';
 import { ACCOUNT_BALANCES_REPOSITORY } from './domain/ports/account-balances-repository';
 import { ACCOUNTS_REPOSITORY } from './domain/ports/accounts-repository';
@@ -14,12 +15,14 @@ import { AUDIT_REPOSITORY } from './domain/ports/audit-repository';
 import { IDEMPOTENCY_REPOSITORY } from './domain/ports/idempotency-repository';
 import { JOURNAL_TRANSACTIONS_REPOSITORY } from './domain/ports/journal-transactions-repository';
 import { OUTBOX_REPOSITORY } from './domain/ports/outbox-repository';
+import { STATEMENT_REPOSITORY } from './domain/ports/statement-repository';
 import { DrizzleAccountBalancesRepository } from './infrastructure/persistence/drizzle-account-balances.repository';
 import { DrizzleAccountsRepository } from './infrastructure/persistence/drizzle-accounts.repository';
 import { DrizzleAuditRepository } from './infrastructure/persistence/drizzle-audit.repository';
 import { DrizzleIdempotencyRepository } from './infrastructure/persistence/drizzle-idempotency.repository';
 import { DrizzleJournalTransactionsRepository } from './infrastructure/persistence/drizzle-journal-transactions.repository';
 import { DrizzleOutboxRepository } from './infrastructure/persistence/drizzle-outbox.repository';
+import { DrizzleStatementRepository } from './infrastructure/persistence/drizzle-statement.repository';
 import { AccountsController } from './interface/accounts.controller';
 import { AuditController } from './interface/audit.controller';
 import { ReversalsController } from './interface/reversals.controller';
@@ -34,6 +37,7 @@ import { TransfersController } from './interface/transfers.controller';
     TransferService,
     ReverseService,
     AuditService,
+    StatementService,
     { provide: CLOCK, useClass: SystemClock },
     {
       provide: ACCOUNTS_REPOSITORY,
@@ -67,6 +71,11 @@ import { TransfersController } from './interface/transfers.controller';
       provide: AUDIT_REPOSITORY,
       inject: [DB],
       useFactory: (db: Database): DrizzleAuditRepository => new DrizzleAuditRepository(db),
+    },
+    {
+      provide: STATEMENT_REPOSITORY,
+      inject: [DB],
+      useFactory: (db: Database): DrizzleStatementRepository => new DrizzleStatementRepository(db),
     },
   ],
 })
