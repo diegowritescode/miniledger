@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { CurrentPrincipal } from '../../access/principal.decorator';
@@ -6,8 +6,10 @@ import { type Principal } from '../../access/principal';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AccountsService } from '../application/accounts.service';
+import { StatementService } from '../application/statement.service';
 import { type Account } from '../domain/account';
 import { openAccountSchema, type OpenAccountDto } from './open-account.dto';
+import { statementQuerySchema, type StatementQuery } from './statement.dto';
 
 interface AccountResponse {
   id: string;
@@ -17,10 +19,24 @@ interface AccountResponse {
   createdAt: string;
 }
 
+interface StatementResponse {
+  entries: {
+    seq: number;
+    transactionId: string;
+    amount: string;
+    balanceAfter: string;
+    createdAt: string;
+  }[];
+  nextCursor: number | null;
+}
+
 @Controller('accounts')
 @UseGuards(AccessTokenGuard)
 export class AccountsController {
-  constructor(private readonly accounts: AccountsService) {}
+  constructor(
+    private readonly accounts: AccountsService,
+    private readonly statements: StatementService,
+  ) {}
 
   @Post()
   @HttpCode(201)
@@ -64,6 +80,33 @@ export class AccountsController {
   async list(@CurrentPrincipal() principal: Principal): Promise<AccountResponse[]> {
     const accounts = await this.accounts.listVisible(principal.subject);
     return accounts.map((account) => this.toResponse(account));
+  }
+
+  @Get(':id/statement')
+  async statement(
+    @Param('id') id: string,
+    @Query(new ZodValidationPipe(statementQuerySchema)) query: StatementQuery,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<StatementResponse> {
+    const statement = await this.statements.forAccount(
+      id,
+      principal.subject,
+      query.limit,
+      query.cursor ?? null,
+    );
+    if (!statement) {
+      throw new ProblemException({ type: 'about:blank', title: 'Account not found', status: 404 });
+    }
+    return {
+      entries: statement.entries.map((entry) => ({
+        seq: entry.seq,
+        transactionId: entry.transactionId,
+        amount: entry.amount.toString(),
+        balanceAfter: entry.balanceAfter.toString(),
+        createdAt: entry.createdAt.toISOString(),
+      })),
+      nextCursor: statement.nextCursor,
+    };
   }
 
   private toResponse(account: Account): AccountResponse {
