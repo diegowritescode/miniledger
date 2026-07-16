@@ -12,3 +12,6 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# local demo transcript (curated version lives in docs/demo.md)
+miniledger-demo.txt
