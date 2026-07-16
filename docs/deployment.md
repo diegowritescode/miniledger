@@ -113,21 +113,22 @@ this GitHub repository with a **managed Postgres** service (app and data have in
    Traefik TLS. The app sets `trust proxy`, so it honours the proxy's `X-Forwarded-*`.
 5. **Deploy** — trigger the build. Verify `GET /health` and `GET /ready` return `200`.
 
-| Variable                        | Production value                                 | Notes                                                     |
-| ------------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
-| `NODE_ENV`                      | `production`                                     |                                                           |
-| `PORT`                          | `3000`                                           | Container port mapped by the Dokploy domain.              |
-| `DATABASE_URL`                  | _(from the Dokploy Postgres service)_            | Managed Postgres connection string.                       |
-| `ACCESSCORE_BASE_URL`           | `https://auth.deviego.xyz`                       | Live AccessCore; the PEP forwards `check()` here.         |
-| `ACCESSCORE_JWKS_URL`           | `https://auth.deviego.xyz/.well-known/jwks.json` | Offline token verification (Ed25519/EdDSA).               |
-| `ACCESSCORE_JWT_ISSUER`         | `https://auth.accesscore.dev`                    | Must equal the deployed AccessCore's `iss` (its default). |
-| `ACCESSCORE_JWT_AUDIENCE`       | `accesscore`                                     | Must equal the deployed AccessCore's `aud` (its default). |
-| `ACCESSCORE_CLOCK_SKEW_SECONDS` | `30`                                             | Allowed `exp`/`nbf` skew.                                 |
-| `ACCESSCORE_CHECK_TIMEOUT_MS`   | `3000`                                           | PEP `check()` timeout — a slow PDP fails closed → 503.    |
+| Variable                        | Production value                                 | Notes                                                  |
+| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| `NODE_ENV`                      | `production`                                     |                                                        |
+| `PORT`                          | `3000`                                           | Container port mapped by the Dokploy domain.           |
+| `DATABASE_URL`                  | _(from the Dokploy Postgres service)_            | Managed Postgres connection string.                    |
+| `ACCESSCORE_BASE_URL`           | `https://auth.deviego.xyz`                       | Live AccessCore; the PEP forwards `check()` here.      |
+| `ACCESSCORE_JWKS_URL`           | `https://auth.deviego.xyz/.well-known/jwks.json` | Offline token verification (Ed25519/EdDSA).            |
+| `ACCESSCORE_JWT_ISSUER`         | `https://auth.deviego.xyz`                       | Must equal the deployed AccessCore's `iss` claim.      |
+| `ACCESSCORE_JWT_AUDIENCE`       | `accesscore`                                     | Must equal the deployed AccessCore's `aud` claim.      |
+| `ACCESSCORE_CLOCK_SKEW_SECONDS` | `30`                                             | Allowed `exp`/`nbf` skew.                              |
+| `ACCESSCORE_CHECK_TIMEOUT_MS`   | `3000`                                           | PEP `check()` timeout — a slow PDP fails closed → 503. |
 
-> `ACCESSCORE_JWT_ISSUER`/`ACCESSCORE_JWT_AUDIENCE` are AccessCore's own defaults; override them only if
-> that deployment overrode `JWT_ISSUER`/`JWT_AUDIENCE`. A protected call also requires the caller's
-> subject to hold the matching `ledger.*` permission in AccessCore on `{type: "ledger", id: "miniledger"}`.
+> `ACCESSCORE_JWT_ISSUER` must equal the deployed AccessCore's `iss` claim — the live instance issues
+> `https://auth.deviego.xyz` (its domain), not the code default `https://auth.accesscore.dev`; a
+> mismatch fails offline verification with 401. A protected call also requires the caller's subject to
+> hold the matching `ledger.*` permission in AccessCore on `{type: "ledger", id: "miniledger"}`.
 
 ## Rollback & observability
 
