@@ -8,7 +8,8 @@
   ([ADR-004](adr/004-money-representation.md)). A posting's `amount` is **signed**: the source leg
   is negative (money leaving), the destination leg is positive (money arriving); the legs of a
   transaction sum to zero.
-- **Authentication** — `Authorization: Bearer <jwt>` on every route except `/health`, `/ready`, and `/metrics`.
+- **Interactive docs** — Swagger UI at `/docs`; the OpenAPI 3 document at `/docs-json`.
+- **Authentication** — `Authorization: Bearer <jwt>` on every route except `/health`, `/ready`, `/metrics`, `/docs`.
   The token is an AccessCore EdDSA access token, verified offline
   ([security.md](security.md#authentication)). Missing/invalid → **401**.
 - **Authorization** — privileged routes also require an AccessCore capability

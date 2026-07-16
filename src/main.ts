@@ -8,6 +8,7 @@ import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { ENV } from './config/env.module';
 import type { Env } from './config/env';
+import { setupOpenApi } from './openapi';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
@@ -16,6 +17,7 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
   app.useBodyParser('json', { limit: '32kb' });
   app.enableShutdownHooks();
+  setupOpenApi(app);
   const env = app.get<Env>(ENV);
   await app.listen(env.PORT);
   Logger.log(`MiniLedger API listening on :${env.PORT}`, 'Bootstrap');

@@ -2,7 +2,7 @@
 
 > A double-entry financial ledger API — idempotent transfers, concurrency-safe balances, and an immutable audit trail.
 
-**Live:** [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — `/health`, `/ready`, and `/metrics` are public; every other route needs an AccessCore bearer token.
+**Live:** [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, `/metrics`, and `/docs` are public, every other route needs an AccessCore bearer token.
 
 ## Overview
 
@@ -33,7 +33,7 @@ Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001�
 
 ## Tech Stack
 
-Node.js · NestJS · TypeScript · PostgreSQL · Drizzle ORM · `jose` · `nestjs-pino` · `prom-client` · `@diegowritescode/accesscore-sdk`
+Node.js · NestJS · TypeScript · PostgreSQL · Drizzle ORM · `jose` · `nestjs-pino` · `prom-client` · `@nestjs/swagger` · `@diegowritescode/accesscore-sdk`
 (Redis and RabbitMQ enter with later spine projects; idempotency here is Postgres-authoritative.)
 
 ## Data Model
@@ -42,7 +42,7 @@ Accounts, transactions, postings, and the audit log. Detail in [`docs/data-model
 
 ## Authentication & Authorization
 
-Every route except `/health`, `/ready`, and `/metrics` requires an **AccessCore bearer token**
+Every route except `/health`, `/ready`, `/metrics`, and `/docs` requires an **AccessCore bearer token**
 (`Authorization: Bearer <jwt>`). Authorization is **hybrid**:
 
 - **Authentication** — a local `AccessTokenGuard` verifies the AccessCore EdDSA (Ed25519) token

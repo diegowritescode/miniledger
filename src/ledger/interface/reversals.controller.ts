@@ -1,6 +1,8 @@
 import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
+import { openApiSchema } from '../../shared/http/openapi-schema';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { type ReverseError, ReverseService } from '../application/reverse.service';
@@ -13,6 +15,8 @@ const PROBLEMS: Record<ReverseError, { status: number; title: string }> = {
   insufficient_funds: { status: 422, title: 'Insufficient funds to reverse' },
 };
 
+@ApiTags('reversals')
+@ApiBearerAuth('access-token')
 @Controller('reversals')
 @UseGuards(AccessTokenGuard)
 export class ReversalsController {
@@ -20,6 +24,8 @@ export class ReversalsController {
 
   @Post()
   @HttpCode(201)
+  @ApiOperation({ summary: 'Reverse a posted transaction with a compensating entry (once-only)' })
+  @ApiBody({ schema: openApiSchema(reversalSchema) })
   @RequirePermission('ledger.reverse', () => ({ type: 'ledger', id: 'miniledger' }))
   async create(
     @Body(new ZodValidationPipe(reversalSchema)) body: ReversalDto,
