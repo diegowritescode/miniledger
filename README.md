@@ -2,7 +2,7 @@
 
 > A double-entry financial ledger API — idempotent transfers, concurrency-safe balances, and an immutable audit trail.
 
-**Live:** [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — `/health` and `/ready` are public; every other route needs an AccessCore bearer token.
+**Live:** [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — `/health`, `/ready`, and `/metrics` are public; every other route needs an AccessCore bearer token.
 
 ## Overview
 
@@ -33,7 +33,7 @@ Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001�
 
 ## Tech Stack
 
-Node.js · NestJS · TypeScript · PostgreSQL · Drizzle ORM · `jose` · `@diegowritescode/accesscore-sdk`
+Node.js · NestJS · TypeScript · PostgreSQL · Drizzle ORM · `jose` · `nestjs-pino` · `prom-client` · `@diegowritescode/accesscore-sdk`
 (Redis and RabbitMQ enter with later spine projects; idempotency here is Postgres-authoritative.)
 
 ## Data Model
@@ -42,7 +42,7 @@ Accounts, transactions, postings, and the audit log. Detail in [`docs/data-model
 
 ## Authentication & Authorization
 
-Every route except `/health` and `/ready` requires an **AccessCore bearer token**
+Every route except `/health`, `/ready`, and `/metrics` requires an **AccessCore bearer token**
 (`Authorization: Bearer <jwt>`). Authorization is **hybrid**:
 
 - **Authentication** — a local `AccessTokenGuard` verifies the AccessCore EdDSA (Ed25519) token
@@ -74,6 +74,10 @@ run sits around **~99% lines, ~98% statements, 100% functions, ~86% branches**. 
 Deployed on **Dokploy** at [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — a multi-stage
 Docker image with migrate-on-start against a managed Postgres, fronted by Traefik TLS. GitHub Actions
 runs `lint → typecheck → build → migrate → coverage`. Runbook in [`docs/deployment.md`](docs/deployment.md).
+
+The app runs as a **least-privilege database role** so the append-only ledger binds at runtime
+([ADR-011](docs/adr/011-least-privilege-db-role.md)), emits **structured JSON logs** with per-request
+correlation ids, and exposes **Prometheus metrics** at `/metrics` ([ADR-012](docs/adr/012-observability.md)).
 
 ## Demo
 

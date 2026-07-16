@@ -140,10 +140,13 @@ this GitHub repository with a **managed Postgres** service (app and data have in
   rollback would be a deliberate, reviewed forward migration.
 - **Health** — `GET /health` (liveness) and `GET /ready` (a `SELECT 1` readiness probe) back
   orchestrator checks; `docker-compose` uses `pg_isready` for the database.
-- **Observability** — structured startup logging today; metrics and tracing are a later hardening
-  item, alongside the LIVE deployment.
+- **Observability** — structured JSON logs (`nestjs-pino`) with a per-request correlation id
+  (`x-request-id`, echoed on the response) and a redacted `Authorization` header; Prometheus metrics
+  at `GET /metrics` (default Node/process metrics plus an `http_request_duration_seconds` histogram —
+  the RED signals per route). See [ADR-012](adr/012-observability.md).
 
 ## Deferred hardening
 
-- **Metrics & tracing** — structured startup logging today; Prometheus/OpenTelemetry are a later
-  observability item.
+- **Distributed tracing** — OpenTelemetry, to adopt alongside a collector and propagate the
+  correlation id as the trace id; structured logs and Prometheus metrics ship today
+  ([ADR-012](adr/012-observability.md)).
