@@ -1,8 +1,10 @@
 import { Body, Controller, Headers, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { CurrentPrincipal } from '../../access/principal.decorator';
 import { type Principal } from '../../access/principal';
+import { openApiSchema } from '../../shared/http/openapi-schema';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import {
@@ -23,6 +25,8 @@ const PROBLEMS: Record<TransferError, { status: number; title: string }> = {
   idempotency_conflict: { status: 409, title: 'Idempotency key reused for a different request' },
 };
 
+@ApiTags('transfers')
+@ApiBearerAuth('access-token')
 @Controller('transfers')
 @UseGuards(AccessTokenGuard)
 export class TransfersController {
@@ -30,6 +34,13 @@ export class TransfersController {
 
   @Post()
   @HttpCode(201)
+  @ApiOperation({ summary: 'Move money between accounts (idempotent via Idempotency-Key)' })
+  @ApiBody({ schema: openApiSchema(transferSchema) })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Makes a retried transfer a no-op.',
+  })
   @RequirePermission('ledger.transfer', () => ({ type: 'ledger', id: 'miniledger' }))
   async create(
     @Body(new ZodValidationPipe(transferSchema)) body: TransferDto,

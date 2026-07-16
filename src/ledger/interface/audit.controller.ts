@@ -1,4 +1,5 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { ProblemException } from '../../shared/http/problem-details';
@@ -19,12 +20,15 @@ interface ConservationResponse {
   byCurrency: { currency: string; total: string }[];
 }
 
+@ApiTags('audit')
+@ApiBearerAuth('access-token')
 @Controller('audit')
 @UseGuards(AccessTokenGuard)
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
   @Get('accounts/:id')
+  @ApiOperation({ summary: "Verify an account's hash chain and reconciliation" })
   @RequirePermission('ledger.audit', () => ({ type: 'ledger', id: 'miniledger' }))
   async verifyAccount(@Param('id') id: string): Promise<AccountAuditResponse> {
     const result = await this.audit.verifyAccount(id);
@@ -49,6 +53,7 @@ export class AuditController {
   }
 
   @Get('conservation')
+  @ApiOperation({ summary: 'Verify conservation of money across all accounts' })
   @RequirePermission('ledger.audit', () => ({ type: 'ledger', id: 'miniledger' }))
   async verifyConservation(): Promise<ConservationResponse> {
     const report = await this.audit.verifyConservation();

@@ -1,8 +1,10 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@diegowritescode/accesscore-sdk';
 import { AccessTokenGuard } from '../../access/access-token.guard';
 import { CurrentPrincipal } from '../../access/principal.decorator';
 import { type Principal } from '../../access/principal';
+import { openApiSchema } from '../../shared/http/openapi-schema';
 import { ProblemException } from '../../shared/http/problem-details';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AccountsService } from '../application/accounts.service';
@@ -30,6 +32,8 @@ interface StatementResponse {
   nextCursor: number | null;
 }
 
+@ApiTags('accounts')
+@ApiBearerAuth('access-token')
 @Controller('accounts')
 @UseGuards(AccessTokenGuard)
 export class AccountsController {
@@ -40,6 +44,8 @@ export class AccountsController {
 
   @Post()
   @HttpCode(201)
+  @ApiOperation({ summary: 'Open a user account' })
+  @ApiBody({ schema: openApiSchema(openAccountSchema) })
   @RequirePermission('ledger.open', () => ({ type: 'ledger', id: 'miniledger' }))
   async open(
     @Body(new ZodValidationPipe(openAccountSchema)) body: OpenAccountDto,
@@ -61,6 +67,7 @@ export class AccountsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Fetch one account (owner-scoped; 404 when not visible)' })
   async getById(
     @Param('id') id: string,
     @CurrentPrincipal() principal: Principal,
@@ -77,12 +84,14 @@ export class AccountsController {
   }
 
   @Get()
+  @ApiOperation({ summary: "List the caller's accounts plus system accounts" })
   async list(@CurrentPrincipal() principal: Principal): Promise<AccountResponse[]> {
     const accounts = await this.accounts.listVisible(principal.subject);
     return accounts.map((account) => this.toResponse(account));
   }
 
   @Get(':id/statement')
+  @ApiOperation({ summary: 'Paginated posting history for an account' })
   async statement(
     @Param('id') id: string,
     @Query(new ZodValidationPipe(statementQuerySchema)) query: StatementQuery,
