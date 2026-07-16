@@ -2,6 +2,8 @@
 
 > A double-entry financial ledger API — idempotent transfers, concurrency-safe balances, and an immutable audit trail.
 
+**Live:** [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — `/health` and `/ready` are public; every other route needs an AccessCore bearer token.
+
 ## Overview
 
 MiniLedger is a transactional ledger service: money moves between accounts as balanced
@@ -26,7 +28,7 @@ concurrency). (Full context in [`docs/business-context.md`](docs/business-contex
 
 ## Architecture
 
-Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–009); detail in
+Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–010); detail in
 [`docs/architecture.md`](docs/architecture.md).
 
 ## Tech Stack
@@ -47,8 +49,8 @@ Every route except `/health` and `/ready` requires an **AccessCore bearer token*
   **offline** against AccessCore's JWKS (`iss`/`aud`/`exp`/`nbf`, 30 s skew) and attaches the
   principal; no round-trip needed to authenticate.
 - **Capability (AccessCore PEP)** — privileged routes forward the token to AccessCore's `check()`
-  for `ledger.open` / `ledger.transfer` / `ledger.audit` on `{type:'ledger', id:'miniledger'}`;
-  deny → 403, PDP unreachable → **503 (fail-closed)**.
+  for `ledger.open` / `ledger.transfer` / `ledger.audit` / `ledger.reverse` on
+  `{type:'ledger', id:'miniledger'}`; deny → 403, PDP unreachable → **503 (fail-closed)**.
 - **Ownership (local)** — `accounts.owner_id` scopes reads to the caller (a non-owner `GET
 /accounts/:id` returns 404, not 403) and requires source-account ownership to transfer (`@world`
   exempt).
@@ -69,8 +71,9 @@ run sits around **~99% lines, ~98% statements, 100% functions, ~86% branches**. 
 
 ## Deployment
 
-Multi-stage Docker image with migrate-on-start; GitHub Actions (`lint → typecheck → build →
-migrate → coverage`). **Live: TBD.** See [`docs/deployment.md`](docs/deployment.md).
+Deployed on **Dokploy** at [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — a multi-stage
+Docker image with migrate-on-start against a managed Postgres, fronted by Traefik TLS. GitHub Actions
+runs `lint → typecheck → build → migrate → coverage`. Runbook in [`docs/deployment.md`](docs/deployment.md).
 
 ## Trade-offs
 
@@ -84,13 +87,16 @@ Emits domain events for the EventBridge spine project; CQRS read models for repo
 
 ```bash
 cp .env.example .env
-docker compose up -d      # PostgreSQL on host port 5433 (see docker-compose.yml)
-npm ci                    # installs the AccessCore SDK from public npmjs — no token needed
-npm run db:migrate        # apply migrations to the running database
+docker compose up -d          # full stack (API on :3000 + PostgreSQL on host 5433)
+# — or, for hot-reload development, run Postgres only and the app from the host:
+docker compose up -d postgres
+npm ci                        # installs the AccessCore SDK from public npmjs — no token needed
+npm run db:migrate            # apply migrations to the running database
 npm run start:dev
 ```
 
-The AccessCore SDK (`@diegowritescode/accesscore-sdk`) resolves from the **public npm registry with
-no auth token**, so a clean clone runs with nothing but a database. Point the `ACCESSCORE_*`
-variables (see [`.env.example`](.env.example)) at a running AccessCore for authenticated requests;
-`/health` and `/ready` need no token. **Live: TBD.**
+`docker compose up` boots the whole stack (API + Postgres) from a clean clone. The AccessCore SDK
+(`@diegowritescode/accesscore-sdk`) resolves from the **public npm registry with no auth token**, so
+that clone needs nothing but Docker. Point the `ACCESSCORE_*` variables (see
+[`.env.example`](.env.example)) at a running AccessCore for authenticated requests; `/health` and
+`/ready` need no token. A live instance runs at [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz).
