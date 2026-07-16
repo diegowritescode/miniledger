@@ -1,8 +1,10 @@
 import { Controller, Get, Inject } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Pool } from 'pg';
 import { PG_POOL } from '../db/db.module';
 
 @Controller()
+@SkipThrottle()
 export class HealthController {
   constructor(@Inject(PG_POOL) private readonly pool: Pool) {}
 

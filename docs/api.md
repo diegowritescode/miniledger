@@ -2,7 +2,7 @@
 
 ## Conventions
 
-- **Base URL** — `http://localhost:3000` in development. **Live: TBD** (a later hardening slice).
+- **Base URL** — `http://localhost:3000` in development; `https://ledger.deviego.xyz` in production.
 - **Content type** — `application/json`. Monetary amounts are **minor-unit `bigint`s serialized as
   strings** (e.g. `"1234"` = `$12.34`), because JSON `number` cannot safely carry them
   ([ADR-004](adr/004-money-representation.md)). A posting's `amount` is **signed**: the source leg
@@ -15,6 +15,8 @@
   (`ledger.open`/`ledger.transfer`/`ledger.reverse`/`ledger.audit`) plus, where applicable, local
   account ownership ([security.md](security.md#authorization)).
 - **Errors** — **RFC 7807** `application/problem+json`: `{ "type", "title", "status", "detail" }`.
+- **Rate limiting** — a per-window request cap (`THROTTLE_LIMIT` per `THROTTLE_TTL_SECONDS`); exceeding
+  it → **429** (RFC 7807). The `/health`, `/ready`, and `/metrics` routes are exempt.
 - **Versioning / pagination** — the surface is small and unversioned; list endpoints are unpaged
   (owner-scoped). Both are candidates if the surface grows.
 
