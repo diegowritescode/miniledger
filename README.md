@@ -75,6 +75,20 @@ Deployed on **Dokploy** at [`https://ledger.deviego.xyz`](https://ledger.deviego
 Docker image with migrate-on-start against a managed Postgres, fronted by Traefik TLS. GitHub Actions
 runs `lint → typecheck → build → migrate → coverage`. Runbook in [`docs/deployment.md`](docs/deployment.md).
 
+## Demo
+
+[`scripts/demo.sh`](scripts/demo.sh) walks the full ledger lifecycle against a running instance —
+open accounts, deposit from `@world`, an idempotent retry, a transfer, the statement, a reversal, and
+the audit hash-chain + conservation checks:
+
+```bash
+BASE_URL=https://ledger.deviego.xyz TOKEN=<accesscore-access-token> ./scripts/demo.sh
+```
+
+A real, annotated run against the **live** deployment (authenticated with a genuine AccessCore token)
+is captured in [`docs/demo.md`](docs/demo.md) — the end-to-end proof that MiniLedger consumes AccessCore
+in production.
+
 ## Trade-offs
 
 Key decisions and why. See [`docs/trade-offs.md`](docs/trade-offs.md) and [`docs/adr/`](docs/adr/).
