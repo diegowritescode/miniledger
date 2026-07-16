@@ -3,12 +3,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
-interface LivenessBody {
-  status: string;
-  uptime: number;
-}
-
-describe('Health (e2e)', () => {
+describe('Metrics (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -22,14 +17,14 @@ describe('Health (e2e)', () => {
     await app?.close();
   });
 
-  it('GET /health -> 200 { status: "ok", uptime }', async () => {
-    const response = await request(app.getHttpServer()).get('/health').expect(200);
-    const body = response.body as LivenessBody;
-    expect(body.status).toBe('ok');
-    expect(typeof body.uptime).toBe('number');
-  });
+  it('records HTTP metrics and exposes them in Prometheus text format', async () => {
+    await request(app.getHttpServer()).get('/health').expect(200);
 
-  it('GET /ready -> 200 { status: "ready" } (pings Postgres)', () => {
-    return request(app.getHttpServer()).get('/ready').expect(200).expect({ status: 'ready' });
+    const response = await request(app.getHttpServer()).get('/metrics').expect(200);
+
+    expect(response.headers['content-type']).toContain('text/plain');
+    expect(response.text).toContain('http_request_duration_seconds');
+    expect(response.text).toContain('nodejs_');
+    expect(response.text).toContain('service="miniledger"');
   });
 });

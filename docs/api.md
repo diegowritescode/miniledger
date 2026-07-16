@@ -8,7 +8,7 @@
   ([ADR-004](adr/004-money-representation.md)). A posting's `amount` is **signed**: the source leg
   is negative (money leaving), the destination leg is positive (money arriving); the legs of a
   transaction sum to zero.
-- **Authentication** — `Authorization: Bearer <jwt>` on every route except `/health` and `/ready`.
+- **Authentication** — `Authorization: Bearer <jwt>` on every route except `/health`, `/ready`, and `/metrics`.
   The token is an AccessCore EdDSA access token, verified offline
   ([security.md](security.md#authentication)). Missing/invalid → **401**.
 - **Authorization** — privileged routes also require an AccessCore capability
@@ -27,6 +27,12 @@ No auth. Returns `200 { "status": "ok" }`. Always succeeds if the process is up.
 ### `GET /ready` — readiness (open)
 
 No auth. Runs a `SELECT 1` DB probe. `200 { "status": "ready" }` when Postgres is reachable.
+
+### `GET /metrics` — Prometheus metrics (open)
+
+No auth (scraped in-network). Default Node/process metrics plus an `http_request_duration_seconds`
+histogram (labels `method` / `route` / `status_code`). `200 text/plain; version=0.0.4`. See
+[ADR-012](adr/012-observability.md).
 
 ### `POST /accounts` — open a user account
 
