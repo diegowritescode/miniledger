@@ -17,6 +17,7 @@ interface AccountResponse {
   id: string;
   type: string;
   currency: string;
+  balance: string;
   overdraftFloor: string | null;
   createdAt: string;
 }
@@ -63,7 +64,7 @@ export class AccountsController {
         detail: result.error,
       });
     }
-    return this.toResponse(result.value);
+    return this.toResponse(result.value, await this.accounts.balanceOf(result.value.id));
   }
 
   @Get(':id')
@@ -80,14 +81,18 @@ export class AccountsController {
         status: 404,
       });
     }
-    return this.toResponse(account);
+    return this.toResponse(account, await this.accounts.balanceOf(account.id));
   }
 
   @Get()
   @ApiOperation({ summary: "List the caller's accounts plus system accounts" })
   async list(@CurrentPrincipal() principal: Principal): Promise<AccountResponse[]> {
     const accounts = await this.accounts.listVisible(principal.subject);
-    return accounts.map((account) => this.toResponse(account));
+    return Promise.all(
+      accounts.map(async (account) =>
+        this.toResponse(account, await this.accounts.balanceOf(account.id)),
+      ),
+    );
   }
 
   @Get(':id/statement')
@@ -118,11 +123,12 @@ export class AccountsController {
     };
   }
 
-  private toResponse(account: Account): AccountResponse {
+  private toResponse(account: Account, balance: bigint): AccountResponse {
     return {
       id: account.id.value,
       type: account.type,
       currency: account.currency.code,
+      balance: balance.toString(),
       overdraftFloor: account.overdraftFloor === null ? null : account.overdraftFloor.toString(),
       createdAt: account.createdAt.toISOString(),
     };

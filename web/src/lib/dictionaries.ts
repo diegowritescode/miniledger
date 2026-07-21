@@ -38,6 +38,24 @@ const en: Dict = {
   'overview.integrityTitle': 'Integrity',
   'overview.integrityBody': 'Verify the per-account hash chain and prove money is conserved.',
   'overview.open': 'Open',
+
+  'accounts.title': 'Accounts',
+  'accounts.description':
+    'Your accounts and the shared system accounts. Balances are stored in minor units and shown here formatted to the currency.',
+  'accounts.open': 'Open account',
+  'accounts.opening': 'Opening…',
+  'accounts.currency': 'Currency',
+  'accounts.openTitle': 'Open an account',
+  'accounts.openDescription':
+    'Creates a user account you own, in the chosen currency, with a zero balance.',
+  'accounts.thAccount': 'Account',
+  'accounts.thType': 'Type',
+  'accounts.thCurrency': 'Currency',
+  'accounts.thBalance': 'Balance',
+  'accounts.empty': 'No accounts yet. Open one to get started.',
+  'accounts.system': 'system',
+  'accounts.you': 'you',
+  'accounts.loadError': 'Accounts could not be loaded from the ledger.',
 };
 
 const es: Dict = {
@@ -82,6 +100,24 @@ const es: Dict = {
   'overview.integrityBody':
     'Verificá la cadena de hashes por cuenta y probá que el dinero se conserva.',
   'overview.open': 'Abrir',
+
+  'accounts.title': 'Cuentas',
+  'accounts.description':
+    'Tus cuentas y las cuentas de sistema compartidas. Los balances se guardan en unidades menores y se muestran acá formateados a la moneda.',
+  'accounts.open': 'Abrir cuenta',
+  'accounts.opening': 'Abriendo…',
+  'accounts.currency': 'Moneda',
+  'accounts.openTitle': 'Abrir una cuenta',
+  'accounts.openDescription':
+    'Crea una cuenta de usuario tuya, en la moneda elegida, con balance en cero.',
+  'accounts.thAccount': 'Cuenta',
+  'accounts.thType': 'Tipo',
+  'accounts.thCurrency': 'Moneda',
+  'accounts.thBalance': 'Balance',
+  'accounts.empty': 'Aún no hay cuentas. Abrí una para empezar.',
+  'accounts.system': 'sistema',
+  'accounts.you': 'vos',
+  'accounts.loadError': 'No se pudieron cargar las cuentas del ledger.',
 };
 
 export const dictionaries: { en: Dict; es: Dict } = { en, es };

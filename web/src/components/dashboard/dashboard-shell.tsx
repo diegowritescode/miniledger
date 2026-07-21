@@ -9,7 +9,7 @@ import type { Identity } from '@/lib/identity';
 import { useT } from '../i18n/language-provider';
 import { LanguageToggle } from '../i18n/language-toggle';
 import { Logo } from '../logo';
-import { ExternalIcon, LogoutIcon, OverviewIcon } from '../icons';
+import { AccountsIcon, ExternalIcon, LogoutIcon, OverviewIcon } from '../icons';
 import { Badge, Spinner, cn } from '../ui';
 
 interface NavItem {
@@ -21,6 +21,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: '/dashboard', labelKey: 'nav.overview', icon: OverviewIcon, exact: true },
+  { href: '/dashboard/accounts', labelKey: 'nav.accounts', icon: AccountsIcon },
 ];
 
 const API_DOCS = 'https://ledger.deviego.xyz/docs';
