@@ -4,6 +4,34 @@
 
 **Live:** API [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, `/metrics`, and `/docs` are public, every other route needs an AccessCore bearer token. Web **dashboard** [`https://app.ledger.deviego.xyz`](https://app.ledger.deviego.xyz).
 
+> **Status — complete and deployed.** The ledger core, the AccessCore integration (this is the
+> SDK's first real consumer), the senior ops floor (least-privilege DB role, structured logs,
+> Prometheus metrics, rate limiting, OpenAPI), and a **Next.js dashboard** are all shipped and
+> live. A three-layer test pyramid — including **property-based** invariant tests and a
+> **real-Postgres concurrency** test — backs a merged coverage gate sitting around **~99% lines /
+> 100% functions**. Full rationale in **13 ADRs** under [`docs/adr/`](docs/adr/).
+
+## Why it is a real ledger, not a CRUD app
+
+- **Double-entry, enforced twice.** Every transaction is a set of postings that sum to zero — the
+  ledger invariant — checked in the domain aggregate _and_ by a deferred Postgres `CONSTRAINT
+TRIGGER` at commit ([ADR-005](docs/adr/005-double-entry-model.md)).
+- **Concurrency-safe balances — the signal.** Balances stay correct under concurrent transfers via
+  ordered `SELECT … FOR UPDATE` row-locking (locks acquired in a total order, deadlock-free); a
+  real-Postgres test fires K concurrent transfers and proves no lost update and no overdraft
+  ([ADR-006](docs/adr/006-concurrency-safe-balances.md)).
+- **Idempotent transfers.** An `Idempotency-Key` is claimed in the _same transaction_ as the
+  postings (Postgres-authoritative), so a retried transfer replays the original receipt and a
+  concurrent duplicate executes exactly once ([ADR-007](docs/adr/007-idempotency.md)).
+- **Tamper-evident audit trail.** Each posting is chained (SHA-256) to its predecessor per account;
+  a verifier recomputes the chain and reconciles it to the balance, and money is proven **conserved**
+  (per-currency totals net to zero) ([ADR-008](docs/adr/008-audit-hash-chain.md)).
+- **Money as integers.** Signed integer minor units (`bigint`) + a `Currency` value object — never
+  floats ([ADR-004](docs/adr/004-money-representation.md)).
+- **Delegated auth, fail-closed.** Tokens are AccessCore's, verified **offline** against its JWKS;
+  authorization combines the SDK's capability PEP with local account ownership, and a PDP outage
+  fails closed → 503 ([ADR-009](docs/adr/009-accesscore-integration.md)).
+
 ## Overview
 
 MiniLedger is a transactional ledger service: money moves between accounts as balanced
@@ -28,7 +56,7 @@ concurrency). (Full context in [`docs/business-context.md`](docs/business-contex
 
 ## Architecture
 
-Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–010); detail in
+Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–013); detail in
 [`docs/architecture.md`](docs/architecture.md).
 
 ## Tech Stack
@@ -135,3 +163,13 @@ npm run start:dev
 that clone needs nothing but Docker. Point the `ACCESSCORE_*` variables (see
 [`.env.example`](.env.example)) at a running AccessCore for authenticated requests; `/health` and
 `/ready` need no token. A live instance runs at [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz).
+
+## Contributing & conventions
+
+Local setup, the trunk-based workflow, commit conventions, and the quality gates are in
+[`CONTRIBUTING.md`](CONTRIBUTING.md); community expectations in
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Report vulnerabilities per [`SECURITY.md`](SECURITY.md).
+
+## License
+
+[Apache-2.0](LICENSE).
