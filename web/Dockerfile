@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1
 
-# Build context is web/ (the standalone dashboard app).
+# Build context is the repository ROOT; this app lives in web/.
+# In the deploy platform, set the Dockerfile path to web/Dockerfile and leave
+# the build context at the repository root.
 
 # --- deps: install from the lockfile (manifests only, cache-friendly) ---
 FROM node:22-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY web/package.json web/package-lock.json ./
 RUN npm ci
 
 # --- build: compile to Next.js standalone output ---
@@ -13,7 +15,7 @@ FROM node:22-alpine AS build
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY web/ ./
 RUN npm run build
 
 # --- runtime: minimal image running the standalone server ---
