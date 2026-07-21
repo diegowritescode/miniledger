@@ -1,3 +1,5 @@
+import type { TransferReceipt } from './types';
+
 export type ApiResult<T> =
   | { status: 'ok'; data: T }
   | { status: 'unauthorized' }
@@ -83,4 +85,14 @@ export async function logout(): Promise<void> {
 
 export async function openAccount(currency: string): Promise<ApiResult<{ id: string }>> {
   return post('/api/accounts', { currency });
+}
+
+export async function transfer(
+  input: { from: string; to: string; amount: string; currency: string },
+  idempotencyKey?: string,
+): Promise<ApiResult<TransferReceipt>> {
+  const headers: Record<string, string> = idempotencyKey
+    ? { 'idempotency-key': idempotencyKey }
+    : {};
+  return send('POST', '/api/transfers', input, headers);
 }
