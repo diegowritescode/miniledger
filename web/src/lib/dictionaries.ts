@@ -55,7 +55,25 @@ const en: Dict = {
   'accounts.empty': 'No accounts yet. Open one to get started.',
   'accounts.system': 'system',
   'accounts.you': 'you',
+  'accounts.thActions': 'Actions',
+  'accounts.statement': 'Statement',
   'accounts.loadError': 'Accounts could not be loaded from the ledger.',
+
+  'statement.title': 'Statement',
+  'statement.back': '← Accounts',
+  'statement.sectionTitle': 'Postings',
+  'statement.sectionDescription':
+    'Every posting on this account in sequence, each with the amount and the balance it produced — the raw, append-only history.',
+  'statement.thSeq': 'Seq',
+  'statement.thDate': 'Date (UTC)',
+  'statement.thTxn': 'Transaction',
+  'statement.thAmount': 'Amount',
+  'statement.thBalance': 'Balance',
+  'statement.empty': 'No postings on this account yet.',
+  'statement.loadMore': 'Load more',
+  'statement.loading': 'Loading…',
+  'statement.notFound': 'No such account, or it is not visible to you.',
+  'statement.loadError': 'The statement could not be loaded from the ledger.',
 
   'transfer.title': 'Transfer',
   'transfer.description':
@@ -139,7 +157,25 @@ const es: Dict = {
   'accounts.empty': 'Aún no hay cuentas. Abrí una para empezar.',
   'accounts.system': 'sistema',
   'accounts.you': 'vos',
+  'accounts.thActions': 'Acciones',
+  'accounts.statement': 'Estado',
   'accounts.loadError': 'No se pudieron cargar las cuentas del ledger.',
+
+  'statement.title': 'Estado de cuenta',
+  'statement.back': '← Cuentas',
+  'statement.sectionTitle': 'Asientos',
+  'statement.sectionDescription':
+    'Cada asiento de esta cuenta en secuencia, con el monto y el balance que produjo — el historial crudo, solo-append.',
+  'statement.thSeq': 'Seq',
+  'statement.thDate': 'Fecha (UTC)',
+  'statement.thTxn': 'Transacción',
+  'statement.thAmount': 'Monto',
+  'statement.thBalance': 'Balance',
+  'statement.empty': 'Aún no hay asientos en esta cuenta.',
+  'statement.loadMore': 'Cargar más',
+  'statement.loading': 'Cargando…',
+  'statement.notFound': 'No existe esa cuenta, o no es visible para vos.',
+  'statement.loadError': 'No se pudo cargar el estado de cuenta del ledger.',
 
   'transfer.title': 'Transferir',
   'transfer.description':

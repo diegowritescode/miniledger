@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { ML_TOKEN_COOKIE, callMiniLedger } from './upstream';
-import type { Account } from './types';
+import type { Account, Statement } from './types';
 
 export type LedgerResult<T> = { ok: true; data: T } | { ok: false; status: number };
 
@@ -27,4 +27,12 @@ async function get<T>(path: string): Promise<LedgerResult<T>> {
 
 export function getAccounts(): Promise<LedgerResult<Account[]>> {
   return get('/accounts');
+}
+
+export function getAccount(id: string): Promise<LedgerResult<Account>> {
+  return get(`/accounts/${encodeURIComponent(id)}`);
+}
+
+export function getStatement(id: string, limit = 50): Promise<LedgerResult<Statement>> {
+  return get(`/accounts/${encodeURIComponent(id)}/statement?limit=${limit}`);
 }
