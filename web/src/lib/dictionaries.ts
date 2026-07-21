@@ -56,6 +56,28 @@ const en: Dict = {
   'accounts.system': 'system',
   'accounts.you': 'you',
   'accounts.loadError': 'Accounts could not be loaded from the ledger.',
+
+  'transfer.title': 'Transfer',
+  'transfer.description':
+    'Move money between accounts. Deposit from @world, move between your accounts, or withdraw back to @world. Both sides post together — the ledger stays balanced.',
+  'transfer.formTitle': 'New transfer',
+  'transfer.formDescription':
+    'Same-currency, double-entry. An idempotency key makes a retried transfer a no-op — never a double spend.',
+  'transfer.from': 'From',
+  'transfer.fromHint': '@world funds deposits; your accounts fund transfers.',
+  'transfer.to': 'To',
+  'transfer.noCounterparties': 'No same-currency account to send to',
+  'transfer.amount': 'Amount',
+  'transfer.amountHint': 'In {currency}, e.g. 100.00',
+  'transfer.idempotencyKey': 'Idempotency key',
+  'transfer.idempotencyHint':
+    'Optional. Reuse the same key to retry safely — it will not double-spend.',
+  'transfer.optional': 'optional',
+  'transfer.generate': 'Generate',
+  'transfer.send': 'Send transfer',
+  'transfer.sending': 'Sending…',
+  'transfer.posted': 'Posted',
+  'transfer.needAccounts': 'Open an account first to make a transfer.',
 };
 
 const es: Dict = {
@@ -118,6 +140,28 @@ const es: Dict = {
   'accounts.system': 'sistema',
   'accounts.you': 'vos',
   'accounts.loadError': 'No se pudieron cargar las cuentas del ledger.',
+
+  'transfer.title': 'Transferir',
+  'transfer.description':
+    'Mové dinero entre cuentas. Depositá desde @world, mové entre tus cuentas, o retirá de vuelta a @world. Ambos lados se asientan juntos — el ledger queda balanceado.',
+  'transfer.formTitle': 'Nueva transferencia',
+  'transfer.formDescription':
+    'Misma moneda, doble entrada. Una idempotency key hace que un reintento sea un no-op — nunca un doble gasto.',
+  'transfer.from': 'Desde',
+  'transfer.fromHint': '@world financia depósitos; tus cuentas financian transferencias.',
+  'transfer.to': 'Hacia',
+  'transfer.noCounterparties': 'No hay cuenta en la misma moneda para enviar',
+  'transfer.amount': 'Monto',
+  'transfer.amountHint': 'En {currency}, p. ej. 100.00',
+  'transfer.idempotencyKey': 'Idempotency key',
+  'transfer.idempotencyHint':
+    'Opcional. Reusá la misma key para reintentar sin riesgo — no duplicará el gasto.',
+  'transfer.optional': 'opcional',
+  'transfer.generate': 'Generar',
+  'transfer.send': 'Enviar transferencia',
+  'transfer.sending': 'Enviando…',
+  'transfer.posted': 'Asentada',
+  'transfer.needAccounts': 'Abrí una cuenta primero para transferir.',
 };
 
 export const dictionaries: { en: Dict; es: Dict } = { en, es };
