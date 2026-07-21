@@ -12,6 +12,7 @@ interface AccountResponse {
   id: string;
   type: string;
   currency: string;
+  balance: string;
   overdraftFloor: string | null;
   createdAt: string;
 }
@@ -58,6 +59,7 @@ describe('Accounts (e2e)', () => {
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(body.type).toBe('user');
     expect(body.currency).toBe('USD');
+    expect(body.balance).toBe('0');
     expect(body.overdraftFloor).toBe('0');
     expect(typeof body.createdAt).toBe('string');
   });

@@ -49,4 +49,8 @@ export class AccountsService {
   listVisible(subject: string): Promise<Account[]> {
     return this.accounts.listVisibleTo(subject);
   }
+
+  async balanceOf(id: AccountId): Promise<bigint> {
+    return (await this.balances.find(id)) ?? 0n;
+  }
 }

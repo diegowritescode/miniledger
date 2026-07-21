@@ -55,6 +55,7 @@ const buildRepo = (
 interface BalancesMocks {
   readonly repository: AccountBalancesRepository;
   readonly initialize: jest.Mock<Promise<void>, [AccountId, Tx?]>;
+  readonly find: jest.Mock<Promise<bigint | null>, [AccountId, Tx?]>;
 }
 
 const buildBalances = (): BalancesMocks => {
@@ -67,7 +68,7 @@ const buildBalances = (): BalancesMocks => {
     .fn<Promise<Map<string, LockedBalance>>, [readonly AccountId[], Tx]>()
     .mockResolvedValue(new Map());
   const repository: AccountBalancesRepository = { initialize, find, updateBalance, lockForUpdate };
-  return { repository, initialize };
+  return { repository, initialize, find };
 };
 
 const passthroughUow: UnitOfWork = {
@@ -176,6 +177,28 @@ describe('AccountsService', () => {
 
       expect(await service.listVisible('user-1')).toBe(accounts);
       expect(listVisibleTo).toHaveBeenCalledWith('user-1');
+    });
+  });
+
+  describe('balanceOf', () => {
+    it('returns the stored balance for the account', async () => {
+      const { repository } = buildRepo();
+      const balances = buildBalances();
+      balances.find.mockResolvedValue(4200n);
+      const service = buildService(repository, balances.repository);
+
+      const id = AccountId.generate();
+      expect(await service.balanceOf(id)).toBe(4200n);
+      expect(balances.find).toHaveBeenCalledWith(id);
+    });
+
+    it('reports a zero balance when no balance row exists', async () => {
+      const { repository } = buildRepo();
+      const balances = buildBalances();
+      balances.find.mockResolvedValue(null);
+      const service = buildService(repository, balances.repository);
+
+      expect(await service.balanceOf(AccountId.generate())).toBe(0n);
     });
   });
 });

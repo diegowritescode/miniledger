@@ -80,3 +80,7 @@ export async function logout(): Promise<void> {
     // best effort; the cookie is cleared server-side
   }
 }
+
+export async function openAccount(currency: string): Promise<ApiResult<{ id: string }>> {
+  return post('/api/accounts', { currency });
+}
