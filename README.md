@@ -56,7 +56,7 @@ concurrency). (Full context in [`docs/business-context.md`](docs/business-contex
 
 ## Architecture
 
-Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–010); detail in
+Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–013); detail in
 [`docs/architecture.md`](docs/architecture.md).
 
 ## Tech Stack
