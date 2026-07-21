@@ -28,3 +28,18 @@ export interface TransferReceipt {
     balanceAfter: string;
   }[];
 }
+
+export interface ConservationReport {
+  conserved: boolean;
+  byCurrency: { currency: string; total: string }[];
+}
+
+export interface AccountAudit {
+  accountId: string;
+  postingCount: number;
+  balance: string;
+  chainValid: boolean;
+  headMatches: boolean;
+  reconciled: boolean;
+  brokenAtSeq: number | null;
+}
