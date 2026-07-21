@@ -136,6 +136,34 @@ this GitHub repository with a **managed Postgres** service (app and data have in
 > mismatch fails offline verification with 401. A protected call also requires the caller's subject to
 > hold the matching `ledger.*` permission in AccessCore on `{type: "ledger", id: "miniledger"}`.
 
+## Dashboard (`web/`)
+
+The dashboard is a **separate deployable** — a Next.js backend-for-frontend under [`web/`](../web),
+its own image and domain (a sibling of the API, not a workspace — [ADR-013](adr/013-web-dashboard.md)).
+It holds no data and no secrets: it authenticates against **AccessCore** and proxies ledger calls to
+**MiniLedger** server-side, keeping the access token in an httpOnly cookie.
+
+1. **Application** — create a second **Application** from the same `diegowritescode/miniledger` repo,
+   **Docker (Dockerfile)** build. Set the **Dockerfile path** to `web/Dockerfile` and leave the
+   **build context at the repository root** — the Dockerfile copies from `web/` and compiles the
+   Next.js standalone output.
+2. **Environment** — two public URLs, no secrets (below).
+3. **Domain** — map **`app.ledger.deviego.xyz`** to the app on container port **3002** with Traefik
+   TLS. The API keeps `ledger.deviego.xyz`; the two are independent hosts.
+4. **Deploy** — trigger the build, then open `/login` and sign in with an AccessCore account that
+   holds the `ledger` operator capability.
+
+| Variable             | Production value             | Notes                                          |
+| -------------------- | ---------------------------- | ---------------------------------------------- |
+| `NODE_ENV`           | `production`                 |                                                |
+| `PORT`               | `3002`                       | Set by the image; map the domain to this port. |
+| `ACCESSCORE_API_URL` | `https://auth.deviego.xyz`   | Login/logout proxy target (AccessCore).        |
+| `MINILEDGER_API_URL` | `https://ledger.deviego.xyz` | Ledger data proxy target (this API).           |
+
+> The signed-in AccessCore subject must hold `ledger.open` / `ledger.transfer` / `ledger.audit` /
+> `ledger.reverse` on `{type: "ledger", id: "miniledger"}` — the same PAP grant the API demo uses.
+> Otherwise the dashboard renders but privileged actions return 403.
+
 ## Rollback & observability
 
 - **Rollback** — deploy the previous image tag. Migrations are **additive/forward-only** (append-only
