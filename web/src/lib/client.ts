@@ -1,4 +1,4 @@
-import type { TransferReceipt } from './types';
+import type { Statement, TransferReceipt } from './types';
 
 export type ApiResult<T> =
   | { status: 'ok'; data: T }
@@ -85,6 +85,14 @@ export async function logout(): Promise<void> {
 
 export async function openAccount(currency: string): Promise<ApiResult<{ id: string }>> {
   return post('/api/accounts', { currency });
+}
+
+export async function fetchStatement(
+  id: string,
+  cursor: number,
+  limit = 50,
+): Promise<ApiResult<Statement>> {
+  return get(`/api/accounts/${encodeURIComponent(id)}/statement?limit=${limit}&cursor=${cursor}`);
 }
 
 export async function transfer(

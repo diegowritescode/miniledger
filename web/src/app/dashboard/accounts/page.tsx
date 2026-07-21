@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { DataTable, EmptyState, PageHeader, Section, Td, Th } from '@/components/dashboard/kit';
 import { OpenAccountForm } from '@/components/dashboard/open-account-form';
@@ -35,6 +36,7 @@ export default async function AccountsPage() {
               <Th>{t('accounts.thType')}</Th>
               <Th>{t('accounts.thCurrency')}</Th>
               <Th className="text-right">{t('accounts.thBalance')}</Th>
+              <Th className="text-right">{t('accounts.thActions')}</Th>
             </tr>
           }
         >
@@ -53,6 +55,14 @@ export default async function AccountsPage() {
               <Td className="font-mono">{account.currency}</Td>
               <Td className="text-right font-mono tabular-nums">
                 {formatMoney(account.balance, account.currency)}
+              </Td>
+              <Td className="text-right">
+                <Link
+                  href={`/dashboard/accounts/${account.id}/statement`}
+                  className="text-xs font-medium text-brand-strong transition-colors hover:opacity-80"
+                >
+                  {t('accounts.statement')}
+                </Link>
               </Td>
             </tr>
           ))}
