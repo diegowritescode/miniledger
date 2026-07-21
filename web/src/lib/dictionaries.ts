@@ -96,6 +96,30 @@ const en: Dict = {
   'transfer.sending': 'Sending…',
   'transfer.posted': 'Posted',
   'transfer.needAccounts': 'Open an account first to make a transfer.',
+
+  'integrity.title': 'Integrity',
+  'integrity.description':
+    'Prove the ledger has not been tampered with: money is conserved across every account, and each account is an unbroken hash chain reconciled to its balance.',
+  'integrity.reverify': 'Re-verify',
+  'integrity.verifying': 'Verifying…',
+  'integrity.conservationTitle': 'Conservation of money',
+  'integrity.conservationDescription':
+    'Every posting is balanced, so the sum across all accounts must be exactly zero — per currency. Any drift would mean value was invented or lost.',
+  'integrity.conserved': 'Conserved',
+  'integrity.notConserved': 'Not conserved',
+  'integrity.conservationExplainer':
+    'The signed total of every account nets to zero, per currency.',
+  'integrity.chainTitle': 'Per-account hash chain',
+  'integrity.chainDescription':
+    'Each posting is chained (SHA-256) to the previous one and reconciled to the stored balance. A tampered or missing posting breaks the chain at a known sequence.',
+  'integrity.thAccount': 'Account',
+  'integrity.thPostings': 'Postings',
+  'integrity.thBalance': 'Balance',
+  'integrity.thChain': 'Chain',
+  'integrity.intact': 'Intact',
+  'integrity.broken': 'Broken at #{seq}',
+  'integrity.noAccounts': 'No accounts to verify yet.',
+  'integrity.loadError': 'The integrity report could not be loaded from the ledger.',
 };
 
 const es: Dict = {
@@ -198,6 +222,29 @@ const es: Dict = {
   'transfer.sending': 'Enviando…',
   'transfer.posted': 'Asentada',
   'transfer.needAccounts': 'Abrí una cuenta primero para transferir.',
+
+  'integrity.title': 'Integridad',
+  'integrity.description':
+    'Probá que el ledger no fue manipulado: el dinero se conserva en todas las cuentas, y cada cuenta es una cadena de hashes intacta reconciliada con su balance.',
+  'integrity.reverify': 'Re-verificar',
+  'integrity.verifying': 'Verificando…',
+  'integrity.conservationTitle': 'Conservación del dinero',
+  'integrity.conservationDescription':
+    'Cada asiento está balanceado, así que la suma de todas las cuentas debe ser exactamente cero — por moneda. Cualquier desvío significaría que se inventó o perdió valor.',
+  'integrity.conserved': 'Conservado',
+  'integrity.notConserved': 'No conservado',
+  'integrity.conservationExplainer': 'El total firmado de cada cuenta suma cero, por moneda.',
+  'integrity.chainTitle': 'Cadena de hashes por cuenta',
+  'integrity.chainDescription':
+    'Cada asiento se encadena (SHA-256) al anterior y se reconcilia con el balance almacenado. Un asiento manipulado o faltante rompe la cadena en una secuencia conocida.',
+  'integrity.thAccount': 'Cuenta',
+  'integrity.thPostings': 'Asientos',
+  'integrity.thBalance': 'Balance',
+  'integrity.thChain': 'Cadena',
+  'integrity.intact': 'Intacta',
+  'integrity.broken': 'Rota en #{seq}',
+  'integrity.noAccounts': 'Aún no hay cuentas para verificar.',
+  'integrity.loadError': 'No se pudo cargar el reporte de integridad del ledger.',
 };
 
 export const dictionaries: { en: Dict; es: Dict } = { en, es };

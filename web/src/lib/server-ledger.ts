@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { ML_TOKEN_COOKIE, callMiniLedger } from './upstream';
-import type { Account, Statement } from './types';
+import type { Account, AccountAudit, ConservationReport, Statement } from './types';
 
 export type LedgerResult<T> = { ok: true; data: T } | { ok: false; status: number };
 
@@ -35,4 +35,12 @@ export function getAccount(id: string): Promise<LedgerResult<Account>> {
 
 export function getStatement(id: string, limit = 50): Promise<LedgerResult<Statement>> {
   return get(`/accounts/${encodeURIComponent(id)}/statement?limit=${limit}`);
+}
+
+export function getConservation(): Promise<LedgerResult<ConservationReport>> {
+  return get('/audit/conservation');
+}
+
+export function getAccountAudit(id: string): Promise<LedgerResult<AccountAudit>> {
+  return get(`/audit/accounts/${encodeURIComponent(id)}`);
 }
