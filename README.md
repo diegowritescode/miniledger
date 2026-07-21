@@ -2,7 +2,7 @@
 
 > A double-entry financial ledger API — idempotent transfers, concurrency-safe balances, and an immutable audit trail.
 
-**Live:** [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, `/metrics`, and `/docs` are public, every other route needs an AccessCore bearer token.
+**Live:** API [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, `/metrics`, and `/docs` are public, every other route needs an AccessCore bearer token. Web **dashboard** [`https://app.ledger.deviego.xyz`](https://app.ledger.deviego.xyz).
 
 ## Overview
 
@@ -78,6 +78,23 @@ runs `lint → typecheck → build → migrate → coverage`. Runbook in [`docs/
 The app runs as a **least-privilege database role** so the append-only ledger binds at runtime
 ([ADR-011](docs/adr/011-least-privilege-db-role.md)), emits **structured JSON logs** with per-request
 correlation ids, and exposes **Prometheus metrics** at `/metrics` ([ADR-012](docs/adr/012-observability.md)).
+
+## Dashboard
+
+A web dashboard lives in [`web/`](web) — a **Next.js backend-for-frontend** deployed alongside the
+API at [`https://app.ledger.deviego.xyz`](https://app.ledger.deviego.xyz). It signs in against
+**AccessCore** (the browser never holds a token — it is kept in an httpOnly cookie and every call is
+proxied server-side) and drives the ledger:
+
+- **Accounts** — open accounts and read balances, formatted per currency.
+- **Transfer** — move money with an optional idempotency key; the double-entry receipt shows both legs.
+- **Statement** — an account's append-only posting history, cursor-paginated.
+- **Integrity** — verifies **conservation of money** (per-currency totals net to zero) and each
+  account's **hash chain** (intact, or broken at a known sequence) — the tamper-evidence made visible.
+
+Light theme, English/Spanish. It is a separate deployable (its own image and domain, not a
+workspace — [ADR-013](docs/adr/013-web-dashboard.md)); see [`web/README.md`](web/README.md) and the
+[deploy runbook](docs/deployment.md#dashboard-web).
 
 ## Demo
 
