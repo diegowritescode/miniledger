@@ -1,0 +1,19 @@
+title = "MiniLedger gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Dev/test-only, non-production values (never used in production)"
+paths = [
+  '''\.env\.example$''',
+  '''.*\.spec\.ts$''',
+  '''.*\.e2e-spec\.ts$''',
+  '''.*\.int-spec\.ts$''',
+  '''\.github/workflows/ci\.yml$''',
+  '''docker-compose\.yml$''',
+]
+regexes = [
+  '''correct horse staple''',
+  '''miniledger:miniledger''',
+]
