@@ -110,7 +110,7 @@ export class TransferService {
   }
 
   private fingerprint(input: TransferInput): string {
-    const canonical = `${input.from}|${input.to}|${input.amount}|${input.currency}`;
+    const canonical = `${input.ownerId}|${input.from}|${input.to}|${input.amount}|${input.currency}`;
     return createHash('sha256').update(canonical).digest('hex');
   }
 }

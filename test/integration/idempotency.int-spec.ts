@@ -155,6 +155,37 @@ describe('Transfer idempotency (integration)', () => {
     expect(await balances.find(b)).toBe(100n);
   });
 
+  it("does not leak another owner's receipt when a key is reused across subjects", async () => {
+    const a = await openAccount();
+    const b = await openAccount();
+    await deposit(a, 1000n);
+    const k = key();
+
+    const first = await service.transfer({
+      from: a.value,
+      to: b.value,
+      amount: '250',
+      currency: 'USD',
+      ownerId: 'owner-test',
+      idempotencyKey: k,
+    });
+    expect(first.ok).toBe(true);
+
+    const otherSubject = await service.transfer({
+      from: a.value,
+      to: b.value,
+      amount: '250',
+      currency: 'USD',
+      ownerId: 'attacker',
+      idempotencyKey: k,
+    });
+
+    expect(otherSubject.ok).toBe(false);
+    if (otherSubject.ok) return;
+    expect(otherSubject.error).toBe('idempotency_conflict');
+    expect(await balances.find(b)).toBe(250n);
+  });
+
   it('executes exactly once for two concurrent identical requests', async () => {
     const a = await openAccount();
     const b = await openAccount();
