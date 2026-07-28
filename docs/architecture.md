@@ -76,6 +76,13 @@ The application layer references only ports (`ACCOUNTS_REPOSITORY`, `ACCOUNT_BAL
 `LedgerModule`. The domain layer imports nothing from NestJS or Drizzle, which is what makes the
 sum-zero, overdraft, and hash-chain rules unit- and property-testable with no IO.
 
+These boundaries are **enforced in CI, not just documented**.
+[`dependency-cruiser`](../.dependency-cruiser.cjs) runs as `npm run arch` in the `verify` job and
+fails the build on any forbidden import: the domain may not point outward or import a framework/ORM
+(zero `npm` deps, Node core allowed), the application may not import an infrastructure adapter,
+neither application nor infrastructure may depend on `interface`, and no cycles are allowed.
+Composition roots (`*.module.ts`, `main.ts`) are excluded — wiring adapters to ports is their job.
+
 ## Key flows
 
 ### Transfer (`POST /transfers`)
