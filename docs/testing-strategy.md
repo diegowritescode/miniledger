@@ -40,6 +40,26 @@ thresholds of **90% lines / 90% statements / 85% functions / 75% branches**; CI 
 Declarative Drizzle table schemas and migrations are excluded — they are verified by the
 integration tests against real Postgres, not by unit coverage.
 
+## Mutation testing (do the tests actually catch bugs?)
+
+Coverage says a line _ran_; it does not say a test would _fail_ if that line were wrong.
+[Stryker](https://stryker-mutator.io) injects faults into the **ledger domain** — the double-entry
+invariants, overdraft rule, and per-account hash chain — and measures how many the suite kills.
+
+Run it with `npm run mutation` (scoped to `src/ledger/domain/**`). Current score: **100% (88
+mutants killed, 0 survived)**. The `account`, `journal-transaction`, `overdraft`, and `posting`
+aggregates are at 100%; the property-based suites (`fast-check`) are what make that hold over
+arbitrary inputs rather than a handful of examples. The exercise surfaced two real gaps and turned
+them into tests: `totalAmount` was only ever asserted on balanced (sum-zero) postings — where
+`sum + x` and `sum - x` are indistinguishable — and the hash chain's `'|'` field separator (which
+makes the pre-image **injective**, so `('t','12')` cannot collide with `('t1','2')`) had no test
+pinning it.
+
+CI runs Stryker in a dedicated [`Mutation`](../.github/workflows/mutation.yml) workflow (on domain
+changes, weekly, and on demand) with a **`break` threshold that fails the build if the score
+regresses**. It is kept off the critical `verify` path deliberately — mutation score is a trend to
+defend, not a per-commit blocker.
+
 ## What is intentionally not tested
 
 - **The `REVOKE UPDATE, DELETE` on `postings`** is not asserted by a test, because the app connects

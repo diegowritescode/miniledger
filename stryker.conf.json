@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "jest",
+  "jest": {
+    "configFile": "jest.config.js"
+  },
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/ledger/domain/**/*.ts",
+    "!src/ledger/domain/**/*.spec.ts",
+    "!src/ledger/domain/ports/**"
+  ],
+  "reporters": ["progress", "clear-text", "html"],
+  "htmlReporter": { "fileName": "reports/mutation/index.html" },
+  "clearTextReporter": { "maxTestsToLog": 1 },
+  "thresholds": { "high": 95, "low": 90, "break": 90 },
+  "concurrency": 4,
+  "disableTypeChecks": true
+}

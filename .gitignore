@@ -15,3 +15,7 @@ coverage/
 
 # local demo transcript (curated version lives in docs/demo.md)
 miniledger-demo.txt
+
+# mutation testing (Stryker) — sandbox may contain a copied .env, never commit it
+.stryker-tmp/
+reports/mutation/

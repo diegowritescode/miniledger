@@ -24,6 +24,22 @@ describe('hashPosting', () => {
     expect(hashPosting(null, base)).toBe(hashPosting('', base));
   });
 
+  it('separates fields so adjacent values cannot be shifted between them (injective encoding)', () => {
+    const left: PostingContent = {
+      transactionId: 't',
+      accountId: '12',
+      amount: 0n,
+      balanceAfter: 0n,
+    };
+    const right: PostingContent = {
+      transactionId: 't1',
+      accountId: '2',
+      amount: 0n,
+      balanceAfter: 0n,
+    };
+    expect(hashPosting(null, left)).not.toBe(hashPosting(null, right));
+  });
+
   it('changes when the amount changes', () => {
     expect(hashPosting('prev', base)).not.toBe(hashPosting('prev', { ...base, amount: -101n }));
   });
