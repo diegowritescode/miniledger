@@ -33,4 +33,12 @@ describe('balance fold', () => {
     expect(totalAmount(postings)).toBe(0n);
     expect(totalAmount([])).toBe(0n);
   });
+
+  it('sums (does not subtract) when the postings do not net to zero', () => {
+    const postings = [
+      Posting.of(AccountId.generate(), usd(100n)),
+      Posting.of(AccountId.generate(), usd(50n)),
+    ];
+    expect(totalAmount(postings)).toBe(150n);
+  });
 });
