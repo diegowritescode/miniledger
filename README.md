@@ -2,14 +2,14 @@
 
 > A double-entry financial ledger API — idempotent transfers, concurrency-safe balances, and an immutable audit trail.
 
-**Live:** API [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, `/metrics`, and `/docs` are public, every other route needs an AccessCore bearer token. Web **dashboard** [`https://app.ledger.deviego.xyz`](https://app.ledger.deviego.xyz).
+**Live:** API [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, and `/docs` are public, every other route needs an AccessCore bearer token. Web **dashboard** [`https://app.ledger.deviego.xyz`](https://app.ledger.deviego.xyz).
 
 > **Status — complete and deployed.** The ledger core, the AccessCore integration (this is the
 > SDK's first real consumer), the senior ops floor (least-privilege DB role, structured logs,
 > Prometheus metrics, rate limiting, OpenAPI), and a **Next.js dashboard** are all shipped and
 > live. A three-layer test pyramid — including **property-based** invariant tests and a
 > **real-Postgres concurrency** test — backs a merged coverage gate sitting around **~99% lines /
-> 100% functions**. Full rationale in **13 ADRs** under [`docs/adr/`](docs/adr/).
+> 100% functions**. Full rationale in **14 ADRs** under [`docs/adr/`](docs/adr/).
 
 ## Why it is a real ledger, not a CRUD app
 
@@ -99,9 +99,10 @@ run sits around **~99% lines, ~98% statements, 100% functions, ~86% branches**. 
 
 ## Deployment
 
-Deployed on **Dokploy** at [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — a multi-stage
-Docker image with migrate-on-start against a managed Postgres, fronted by Traefik TLS. GitHub Actions
-runs `lint → typecheck → build → migrate → coverage`. Runbook in [`docs/deployment.md`](docs/deployment.md).
+Deployed at [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — GitHub Actions runs
+`lint → typecheck → build → migrate → coverage`, then publishes immutable images to GHCR under the
+commit SHA; the host runs them from a versioned Compose file behind Traefik TLS, with migrate-on-start
+([ADR-014](docs/adr/014-container-release-and-shared-edge-deployment.md)). Runbook in [`docs/deployment.md`](docs/deployment.md).
 
 The app runs as a **least-privilege database role** so the append-only ledger binds at runtime
 ([ADR-011](docs/adr/011-least-privilege-db-role.md)), emits **structured JSON logs** with per-request

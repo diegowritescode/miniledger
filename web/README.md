@@ -45,9 +45,10 @@ npm run build       # next build (standalone output)
 
 ## Deploy
 
-A multi-stage `Dockerfile` builds the Next.js standalone server. On Dokploy, point the Dockerfile
-path at `web/Dockerfile` with the build context at the repository root, map the domain to port
-`3002`, and set the two `*_API_URL` variables. Full runbook in
-[`docs/deployment.md`](../docs/deployment.md#dashboard-web).
+A multi-stage `Dockerfile` builds the Next.js standalone server (build context: the repository
+root). The `Release` workflow publishes it to GHCR as `miniledger-web`, and
+[`deploy/compose.yml`](../deploy/compose.yml) runs it on port `3002` behind Traefik with the two
+`*_API_URL` variables. Full runbook in
+[`docs/deployment.md`](../docs/deployment.md#production--compose-behind-traefik).
 
 Stack: Next.js 15 · React 19 · TypeScript · Tailwind CSS v4. Light theme, EN/ES.
