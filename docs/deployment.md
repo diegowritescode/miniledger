@@ -7,11 +7,11 @@ clone runs with nothing more than a database.
 
 ## Environments
 
-| Environment    | What differs                                                                                                                                                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Local dev**  | Postgres via `docker compose` on **host port 5433**; app run with `npm run start:dev`. `ACCESSCORE_*` point at a local or shared AccessCore.                                                                                            |
-| **CI**         | Postgres **service container** on `5432`; migrations applied with `drizzle-kit`; the merged coverage gate runs.                                                                                                                         |
-| **Production** | Runs on **Dokploy** at **`https://ledger.deviego.xyz`** from the runtime image against a Dokploy-managed Postgres; `migrate-on-start` applies pending migrations, then boots the API. See [Production — Dokploy](#production--dokploy). |
+| Environment    | What differs                                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local dev**  | Postgres via `docker compose` on **host port 5433**; app run with `npm run start:dev`. `ACCESSCORE_*` point at a local or shared AccessCore.                                                                                    |
+| **CI**         | Postgres **service container** on `5432`; migrations applied with `drizzle-kit`; the merged coverage gate runs.                                                                                                                 |
+| **Production** | Immutable GHCR images run by `deploy/compose.yml` behind Traefik at **`https://ledger.deviego.xyz`**; `migrate-on-start` applies pending migrations, then boots the API. See [Production](#production--compose-behind-traefik). |
 
 ## Local run
 
@@ -99,81 +99,66 @@ npm **Trusted Publishing (OIDC)** from AccessCore's CI — classic/automation to
 per AccessCore
 [ADR-017](https://github.com/diegowritescode/accesscore/blob/main/docs/adr/017-sdk-packaging-and-publishing.md).
 
-## Production — Dokploy
+## Production — Compose behind Traefik
 
-MiniLedger runs on [Dokploy](https://dokploy.com/) at **`https://ledger.deviego.xyz`**, deployed from
-this GitHub repository with a **managed Postgres** service (app and data have independent lifecycles).
+MiniLedger runs at **`https://ledger.deviego.xyz`** (API) and **`https://app.ledger.deviego.xyz`**
+(dashboard) as immutable GHCR images, started by [`deploy/compose.yml`](../deploy/compose.yml)
+behind the host's shared Traefik ([ADR-014](adr/014-container-release-and-shared-edge-deployment.md)).
+The host never builds: the `Release` workflow publishes `miniledger-api` and `miniledger-web` under
+the commit SHA after `CI` passes on `main`.
 
-1. **Database** — create a **PostgreSQL** service in Dokploy; its owner connection string becomes
-   `MIGRATION_DATABASE_URL`. Then create the least-privilege runtime role once ([ADR-011](adr/011-least-privilege-db-role.md)):
-   `CREATE ROLE miniledger_app LOGIN PASSWORD '<strong-password>';` — its connection string becomes
-   `DATABASE_URL`. Migration 0010 grants that role the minimum on the first migrate.
-2. **Application** — create an **Application** from the `diegowritescode/miniledger` repo, **Docker
-   (Dockerfile)** build. The image applies migrations on start (`node dist/migrate.js`) before booting,
-   so the first deploy provisions the schema with no manual step.
-3. **Environment** — set the variables below. No AccessCore service credential is needed: the PEP
-   **forwards the caller's own access token** to AccessCore on each `check()`
-   (`@diegowritescode/accesscore-sdk`), so `ACCESSCORE_BASE_URL` is the only integration wiring.
-4. **Domain** — map **`ledger.deviego.xyz`** to the app on container port **3000** with Dokploy's
-   Traefik TLS. The app sets `trust proxy`, so it honours the proxy's `X-Forwarded-*`.
-5. **Deploy** — trigger the build. Verify `GET /health` and `GET /ready` return `200`.
+```
+                      ┌──────────── edge (external network) ────────────┐
+  :443 ──► Traefik ───┤   api  (ledger.*)          web  (app.ledger.*)   │
+                      └────┬─────────────────────────┬──────────────────┘
+                           │   internal (private)    │
+                        postgres                     └──► api
+  api ──► https://auth.deviego.xyz  (AccessCore: JWKS + check, public contract)
+```
 
-| Variable                        | Production value                                 | Notes                                                  |
-| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
-| `NODE_ENV`                      | `production`                                     |                                                        |
-| `PORT`                          | `3000`                                           | Container port mapped by the Dokploy domain.           |
-| `DATABASE_URL`                  | _(the `miniledger_app` role)_                    | Least-privilege runtime role (ADR-011).                |
-| `MIGRATION_DATABASE_URL`        | _(the owner role)_                               | Runs DDL migrations; falls back to `DATABASE_URL`.     |
-| `ACCESSCORE_BASE_URL`           | `https://auth.deviego.xyz`                       | Live AccessCore; the PEP forwards `check()` here.      |
-| `ACCESSCORE_JWKS_URL`           | `https://auth.deviego.xyz/.well-known/jwks.json` | Offline token verification (Ed25519/EdDSA).            |
-| `ACCESSCORE_JWT_ISSUER`         | `https://auth.deviego.xyz`                       | Must equal the deployed AccessCore's `iss` claim.      |
-| `ACCESSCORE_JWT_AUDIENCE`       | `accesscore`                                     | Must equal the deployed AccessCore's `aud` claim.      |
-| `ACCESSCORE_CLOCK_SKEW_SECONDS` | `30`                                             | Allowed `exp`/`nbf` skew.                              |
-| `ACCESSCORE_CHECK_TIMEOUT_MS`   | `3000`                                           | PEP `check()` timeout — a slow PDP fails closed → 503. |
+**Prerequisites:** Docker Compose, a Traefik v3 on the host with an `le` certificate resolver and
+an external `edge` network it is attached to, DNS `A` records for both hostnames, and a running
+AccessCore.
 
-> `ACCESSCORE_JWT_ISSUER` must equal the deployed AccessCore's `iss` claim — the live instance issues
-> `https://auth.deviego.xyz` (its domain), not the code default `https://auth.accesscore.dev`; a
-> mismatch fails offline verification with 401. A protected call also requires the caller's subject to
-> hold the matching `ledger.*` permission in AccessCore on `{type: "ledger", id: "miniledger"}`.
+```bash
+git clone https://github.com/diegowritescode/miniledger.git /opt/portfolio/miniledger
+cd /opt/portfolio/miniledger/deploy
+cp .env.example .env && chmod 600 .env   # secrets: openssl rand -hex 32; tag = release SHA
+docker compose pull && docker compose up -d
+```
 
-## Dashboard (`web/`)
+On first boot Postgres creates the least-privilege `miniledger_app` role
+([ADR-011](adr/011-least-privilege-db-role.md)); the API applies migrations as the owner, then
+serves as `miniledger_app`. No AccessCore credential is needed: the PEP forwards the caller's own
+access token on each `check()`.
 
-The dashboard is a **separate deployable** — a Next.js backend-for-frontend under [`web/`](../web),
-its own image and domain (a sibling of the API, not a workspace — [ADR-013](adr/013-web-dashboard.md)).
-It holds no data and no secrets: it authenticates against **AccessCore** and proxies ledger calls to
-**MiniLedger** server-side, keeping the access token in an httpOnly cookie.
+| Variable (`deploy/.env`) | Example                        | Notes                                               |
+| ------------------------ | ------------------------------ | --------------------------------------------------- |
+| `MINILEDGER_IMAGE_TAG`   | _(commit SHA)_                 | Immutable image tag; rollback = previous SHA.       |
+| `API_HOST` / `WEB_HOST`  | `ledger.deviego.xyz` / `app.…` | Traefik routes and certificates.                    |
+| `ACCESSCORE_URL`         | `https://auth.deviego.xyz`     | Base URL, JWKS, and required `iss` all derive here. |
+| `POSTGRES_PASSWORD`      | _(secret)_                     | Owner role; runs migrations.                        |
+| `APP_DB_PASSWORD`        | _(secret)_                     | Runtime role `miniledger_app`.                      |
 
-1. **Application** — create a second **Application** from the same `diegowritescode/miniledger` repo,
-   **Docker (Dockerfile)** build. Set the **Dockerfile path** to `web/Dockerfile` and leave the
-   **build context at the repository root** — the Dockerfile copies from `web/` and compiles the
-   Next.js standalone output.
-2. **Environment** — two public URLs, no secrets (below).
-3. **Domain** — map **`app.ledger.deviego.xyz`** to the app on container port **3002** with Traefik
-   TLS. The API keeps `ledger.deviego.xyz`; the two are independent hosts.
-4. **Deploy** — trigger the build, then open `/login` and sign in with an AccessCore account that
-   holds the `ledger` operator capability.
+> `ACCESSCORE_URL` must equal the deployed AccessCore's `iss` claim, or offline verification fails
+> with 401. A protected call also requires the caller's subject to hold the matching `ledger.*`
+> permission in AccessCore on `{type: "ledger", id: "miniledger"}` — the grant in
+> [`demo.md`](demo.md). `/metrics` is not routed publicly.
 
-| Variable             | Production value             | Notes                                          |
-| -------------------- | ---------------------------- | ---------------------------------------------- |
-| `NODE_ENV`           | `production`                 |                                                |
-| `PORT`               | `3002`                       | Set by the image; map the domain to this port. |
-| `ACCESSCORE_API_URL` | `https://auth.deviego.xyz`   | Login/logout proxy target (AccessCore).        |
-| `MINILEDGER_API_URL` | `https://ledger.deviego.xyz` | Ledger data proxy target (this API).           |
-
-> The signed-in AccessCore subject must hold `ledger.open` / `ledger.transfer` / `ledger.audit` /
-> `ledger.reverse` on `{type: "ledger", id: "miniledger"}` — the same PAP grant the API demo uses.
-> Otherwise the dashboard renders but privileged actions return 403.
+The dashboard ([ADR-013](adr/013-web-dashboard.md)) holds no data and no secrets: it logs in against
+AccessCore and proxies ledger calls to the API over the private network, keeping the access token
+in an httpOnly cookie.
 
 ## Rollback & observability
 
-- **Rollback** — deploy the previous image tag. Migrations are **additive/forward-only** (append-only
+- **Rollback** — set `MINILEDGER_IMAGE_TAG` to the previous SHA and `docker compose up -d`. Migrations are **additive/forward-only** (append-only
   postings, `REVOKE`, the deferred trigger); there is no destructive down-migration path, so a schema
   rollback would be a deliberate, reviewed forward migration.
 - **Health** — `GET /health` (liveness) and `GET /ready` (a `SELECT 1` readiness probe) back
   orchestrator checks; `docker-compose` uses `pg_isready` for the database.
 - **Observability** — structured JSON logs (`nestjs-pino`) with a per-request correlation id
   (`x-request-id`, echoed on the response) and a redacted `Authorization` header; Prometheus metrics
-  at `GET /metrics` (default Node/process metrics plus an `http_request_duration_seconds` histogram —
+  at `GET /metrics`, reachable only from a private network in production (default Node/process metrics plus an `http_request_duration_seconds` histogram —
   the RED signals per route). See [ADR-012](adr/012-observability.md).
 
 ## Deferred hardening
