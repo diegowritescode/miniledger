@@ -8,11 +8,14 @@ import { LanguageToggle } from './i18n/language-toggle';
 import { Logo } from './logo';
 import { Button, Callout, Field, TextInput } from './ui';
 
+const DEMO_EMAIL = 'demo@accesscore.dev';
+const DEMO_PASSWORD = 'correct horse battery staple';
+
 export function LoginCard() {
   const t = useT();
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(DEMO_EMAIL);
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -32,6 +35,12 @@ export function LoginCard() {
         ? t('errors.loginUnavailable')
         : t('errors.invalidCredentials'),
     );
+  }
+
+  function fillDemo() {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    setError(null);
   }
 
   return (
@@ -72,9 +81,18 @@ export function LoginCard() {
 
           {error ? <Callout tone="error">{error}</Callout> : null}
 
-          <Button type="submit" disabled={busy || email.trim() === '' || password === ''}>
-            {t('login.submit')}
-          </Button>
+          <div className="flex items-center justify-between gap-3">
+            <Button type="button" variant="ghost" onClick={fillDemo} className="px-2">
+              {t('login.useDemo')}
+            </Button>
+            <Button
+              type="submit"
+              disabled={busy || email.trim() === '' || password === ''}
+              className="min-w-28"
+            >
+              {t('login.submit')}
+            </Button>
+          </div>
         </form>
       </div>
     </div>
