@@ -116,6 +116,10 @@ the commit SHA after `CI` passes on `main`.
   api ──► https://auth.deviego.xyz  (AccessCore: JWKS + check, public contract)
 ```
 
+Stacks share the `edge` network, where every service name is also a DNS name. Two stacks that
+both define `api` would make `api` resolve to either one, so internal calls always use the
+stack-unique alias on the private network (`miniledger-api`), never the bare service name.
+
 **Prerequisites:** Docker Compose, a Traefik v3 on the host with an `le` certificate resolver and
 an external `edge` network it is attached to, DNS `A` records for both hostnames, and a running
 AccessCore.
