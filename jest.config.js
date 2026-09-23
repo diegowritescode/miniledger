@@ -11,6 +11,7 @@ module.exports = {
     '!main.ts',
     '!load-env-file.ts',
     '!migrate.ts',
+    '!seed.ts',
   ],
   coverageDirectory: '../coverage/unit',
   coverageReporters: ['json'],

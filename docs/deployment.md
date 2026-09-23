@@ -149,6 +149,30 @@ The dashboard ([ADR-013](adr/013-web-dashboard.md)) holds no data and no secrets
 AccessCore and proxies ledger calls to the API over the private network, keeping the access token
 in an httpOnly cookie.
 
+### Shared demo: seed and nightly reset
+
+The live instance serves one shared AccessCore login (`demo@accesscore.dev`), so it starts with
+data worth looking at. `dist/seed.js` opens three accounts for a given owner (two USD, one EUR) and
+posts a realistic history through the real services — a payroll deposit, savings transfers, card
+spend, an FX top-up, and a duplicate charge that is then **reversed** — so the statement,
+balances, and integrity panel all have something to show. It goes through `TransferService` and
+`ReverseService`, never raw SQL, so every posting is balanced, hash-chained, and idempotent; running
+it twice is a no-op.
+
+```bash
+docker compose exec -T -e DEMO_OWNER_SUBJECT=<accesscore user id> api node dist/seed.js
+```
+
+Visitors can move the demo's money, so the instance is wiped and reseeded nightly by
+`deploy/demo-reset.sh`: it recreates the database, logs in to AccessCore as the demo user to learn
+its current id (AccessCore reseeds first, which issues a new one), then seeds for that id. The
+script refuses to run unless `DEMO_RESET_ENABLED=true` is set in `deploy/.env`.
+
+```bash
+crontab -e
+0 4 * * * /opt/portfolio/accesscore/deploy/demo-reset.sh >> /opt/portfolio/demo-reset.log 2>&1 && /opt/portfolio/miniledger/deploy/demo-reset.sh >> /opt/portfolio/demo-reset.log 2>&1
+```
+
 ## Rollback & observability
 
 - **Rollback** — set `MINILEDGER_IMAGE_TAG` to the previous SHA and `docker compose up -d`. Migrations are **additive/forward-only** (append-only
