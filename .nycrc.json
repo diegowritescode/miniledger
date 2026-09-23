@@ -9,6 +9,7 @@
     "**/*.schema.ts",
     "src/main.ts",
     "src/migrate.ts",
+    "src/seed.ts",
     "src/load-env-file.ts",
     "src/**/*.d.ts"
   ],
