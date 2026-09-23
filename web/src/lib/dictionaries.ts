@@ -26,7 +26,8 @@ const en: Dict = {
   'login.password': 'Password',
   'login.submit': 'Log in',
   'login.demoHint':
-    'Uses your AccessCore identity — the same credentials as the AccessCore console.',
+    'Prefilled with the shared demo account, which signs in through AccessCore. Demo data resets nightly.',
+  'login.useDemo': 'Use demo account',
 
   'overview.title': 'Overview',
   'overview.description':
@@ -150,7 +151,8 @@ const es: Dict = {
   'login.password': 'Contraseña',
   'login.submit': 'Ingresar',
   'login.demoHint':
-    'Usa tu identidad de AccessCore — las mismas credenciales que la consola de AccessCore.',
+    'Prellenado con la cuenta demo compartida, que inicia sesión vía AccessCore. Los datos demo se reinician cada noche.',
+  'login.useDemo': 'Usar cuenta demo',
 
   'overview.title': 'Resumen',
   'overview.description':
