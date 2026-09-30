@@ -1,63 +1,83 @@
 # MiniLedger
 
-> A double-entry financial ledger API — idempotent transfers, concurrency-safe balances, and an immutable audit trail.
+**A double-entry financial ledger API.** Transfers are idempotent, balances stay correct under
+concurrency, and every posting goes into a tamper-evident audit trail. Authentication and
+authorization are delegated to [AccessCore](https://github.com/diegowritescode/accesscore) through
+its published SDK.
 
-**Live:** API [`https://ledger.deviego.xyz`](https://ledger.deviego.xyz) — interactive API docs at [`/docs`](https://ledger.deviego.xyz/docs); `/health`, `/ready`, and `/docs` are public, every other route needs an AccessCore bearer token. Web **dashboard** [`https://app.ledger.deviego.xyz`](https://app.ledger.deviego.xyz).
+[![CI](https://github.com/diegowritescode/miniledger/actions/workflows/ci.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/ci.yml)
+[![Security](https://github.com/diegowritescode/miniledger/actions/workflows/security.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/security.yml)
+[![Release](https://github.com/diegowritescode/miniledger/actions/workflows/release.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/release.yml)
+![Coverage](https://img.shields.io/badge/coverage-99%25%20lines%20%28merged%29-brightgreen)
+![Mutation score](https://img.shields.io/badge/mutation%20score-100%25%20ledger%20domain-brightgreen)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-> **Status — complete and deployed.** The ledger core, the AccessCore integration (this is the
-> SDK's first real consumer), the senior ops floor (least-privilege DB role, structured logs,
-> Prometheus metrics, rate limiting, OpenAPI), and a **Next.js dashboard** are all shipped and
-> live. A three-layer test pyramid — including **property-based** invariant tests and a
-> **real-Postgres concurrency** test — backs a merged coverage gate sitting around **~99% lines /
-> 100% functions**. Full rationale in **14 ADRs** under [`docs/adr/`](docs/adr/).
+|                   |                                                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard**     | [app.ledger.deviego.xyz](https://app.ledger.deviego.xyz)                                                                          |
+| **API reference** | [ledger.deviego.xyz/docs](https://ledger.deviego.xyz/docs) (OpenAPI)                                                              |
+| **Demo login**    | `demo@accesscore.dev` / `correct horse battery staple` (an AccessCore account; data resets nightly)                               |
+| **Depends on**    | [AccessCore](https://github.com/diegowritescode/accesscore): JWKS for offline token checks, and its PDP for every privileged call |
 
-## Why it is a real ledger, not a CRUD app
+![Integrity panel: money conserved per currency, and every account's hash chain intact](docs/assets/dashboard-integrity.png)
 
-- **Double-entry, enforced twice.** Every transaction is a set of postings that sum to zero — the
-  ledger invariant — checked in the domain aggregate _and_ by a deferred Postgres `CONSTRAINT
-TRIGGER` at commit ([ADR-005](docs/adr/005-double-entry-model.md)).
-- **Concurrency-safe balances — the signal.** Balances stay correct under concurrent transfers via
-  ordered `SELECT … FOR UPDATE` row-locking (locks acquired in a total order, deadlock-free); a
-  real-Postgres test fires K concurrent transfers and proves no lost update and no overdraft
-  ([ADR-006](docs/adr/006-concurrency-safe-balances.md)).
-- **Idempotent transfers.** An `Idempotency-Key` is claimed in the _same transaction_ as the
-  postings (Postgres-authoritative), so a retried transfer replays the original receipt and a
-  concurrent duplicate executes exactly once ([ADR-007](docs/adr/007-idempotency.md)).
-- **Tamper-evident audit trail.** Each posting is chained (SHA-256) to its predecessor per account;
-  a verifier recomputes the chain and reconciles it to the balance, and money is proven **conserved**
-  (per-currency totals net to zero) ([ADR-008](docs/adr/008-audit-hash-chain.md)).
-- **Money as integers.** Signed integer minor units (`bigint`) + a `Currency` value object — never
-  floats ([ADR-004](docs/adr/004-money-representation.md)).
-- **Delegated auth, fail-closed.** Tokens are AccessCore's, verified **offline** against its JWKS;
-  authorization combines the SDK's capability PEP with local account ownership, and a PDP outage
-  fails closed → 503 ([ADR-009](docs/adr/009-accesscore-integration.md)).
+## Where to look first
 
-## Overview
+- **Double entry, enforced twice.** A transaction is built only when its postings sum to zero
+  ([`journal-transaction.ts`](src/ledger/domain/journal-transaction.ts)). A deferred Postgres
+  `CONSTRAINT TRIGGER` rejects any unbalanced commit that bypasses the domain
+  ([ADR-005](docs/adr/005-double-entry-model.md)).
+- **Correct under concurrency.** Balance rows are locked with `SELECT … FOR UPDATE` in a total
+  order, so concurrent transfers cannot deadlock. A real-Postgres test fires concurrent transfers
+  and proves there is no lost update and no overdraft
+  ([`transfer.concurrency.int-spec.ts`](test/integration/transfer.concurrency.int-spec.ts),
+  [ADR-006](docs/adr/006-concurrency-safe-balances.md)).
+- **Exactly-once transfers.** The `Idempotency-Key` is claimed in the same transaction as the
+  postings and fingerprinted with the caller. A retry replays the original receipt, and a
+  concurrent duplicate runs once ([ADR-007](docs/adr/007-idempotency.md)).
+- **Tamper evidence you can re-verify.** Each account's postings form a SHA-256 hash chain,
+  reconciled to the stored balance, and a conservation check proves every currency nets to zero
+  ([ADR-008](docs/adr/008-audit-hash-chain.md)).
+- **Measured, not claimed.** About 1,000 transfers/s sharded, and about 510/s on one lock-serialized
+  hot account (k6, [`performance.md`](docs/performance.md)). Merged coverage is about 99% of lines,
+  and the mutation score on the ledger domain is 100%.
 
-MiniLedger is a transactional ledger service: money moves between accounts as balanced
-double-entry postings, transfers are **idempotent** under retries, balances stay **correct under
-concurrency**, and every change is recorded in an **append-only, tamper-evident audit log**. It
-authenticates and authorizes through **AccessCore** (the portfolio's IAM flagship) via its SDK —
-this project is the SDK's first real consumer.
+## Architecture at a glance
+
+```mermaid
+flowchart TB
+  browser([Browser]) --> web["Dashboard<br/>Next.js BFF"]
+  client([API client]) --> api
+  web -- "server-side proxy" --> api
+  web -- "login" --> accesscore
+
+  api["<b>MiniLedger API</b> · modular monolith<br/>accounts · transfers · reversals · statements · audit"]
+
+  api -- "verifies JWTs offline (JWKS)" --> accesscore["AccessCore<br/>identity + policy decision point"]
+  api -- "SDK check() · fail-closed" --> accesscore
+  api --> pg[("PostgreSQL<br/>postings · balances · hash chain · outbox")]
+```
+
+A hexagonal modular monolith with DDD tactical patterns: the ledger domain has no framework or
+database imports, and [dependency-cruiser](.dependency-cruiser.cjs) fails the build if that
+changes. Full detail is in [`docs/architecture.md`](docs/architecture.md). Every significant decision
+is an ADR in [`docs/adr/`](docs/adr/) (001–014).
+
+<details>
+<summary><b>More screenshots</b>: transfer receipt, statement, accounts</summary>
+
+|                                                                                                                                |                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| ![Transfer: a deposit from @world posted as two balanced legs, with an idempotency key](docs/assets/dashboard-transfer.png)    | ![Statement: the append-only posting history with the balance after each posting](docs/assets/dashboard-statement.png) |
+| ![Accounts: system and user accounts with balances in minor units, formatted per currency](docs/assets/dashboard-accounts.png) |                                                                                                                        |
+
+</details>
 
 ## Business Problem
 
 The proof of a _critical backend_: moving money must be exactly-once, never lose or invent value,
 and stay consistent under concurrent transfers — the elite backend signal (correctness +
 concurrency). (Full context in [`docs/business-context.md`](docs/business-context.md).)
-
-## Main Features
-
-- **Idempotent transfers** — an idempotency key makes a retried transfer a no-op, never a double spend.
-- **Double-entry postings** — every transaction is a set of postings that sum to zero (the ledger invariant).
-- **Concurrency-safe balances** — correct balances under concurrent transfers (ordered `FOR UPDATE` row-locking).
-- **Immutable audit log** — append-only, tamper-evident per-account hash chain over every posting.
-- **Auth via AccessCore** — AccessCore-issued tokens verified locally; authorization combines the SDK's capability PEP with local account ownership (fail-closed).
-
-## Architecture
-
-Hexagonal modular monolith + DDD, recorded across [`docs/adr/`](docs/adr/) (001–013); detail in
-[`docs/architecture.md`](docs/architecture.md).
 
 ## Tech Stack
 
@@ -71,7 +91,7 @@ Accounts, transactions, postings, and the audit log. Detail in [`docs/data-model
 ## Authentication & Authorization
 
 Every route except `/health`, `/ready`, `/metrics`, and `/docs` requires an **AccessCore bearer token**
-(`Authorization: Bearer <jwt>`). Authorization is **hybrid**:
+(`Authorization: Bearer <jwt>`); in production the public edge does not route `/metrics` at all. Authorization is **hybrid**:
 
 - **Authentication** — a local `AccessTokenGuard` verifies the AccessCore EdDSA (Ed25519) token
   **offline** against AccessCore's JWKS (`iss`/`aud`/`exp`/`nbf`, 30 s skew) and attaches the
@@ -123,7 +143,7 @@ proxied server-side) and drives the ledger:
 
 Light theme, English/Spanish. It is a separate deployable (its own image and domain, not a
 workspace — [ADR-013](docs/adr/013-web-dashboard.md)); see [`web/README.md`](web/README.md) and the
-[deploy runbook](docs/deployment.md#dashboard-web).
+[deploy runbook](docs/deployment.md#production--compose-behind-traefik).
 
 ## Demo
 
@@ -141,11 +161,23 @@ in production.
 
 ## Trade-offs
 
-Key decisions and why. See [`docs/trade-offs.md`](docs/trade-offs.md) and [`docs/adr/`](docs/adr/).
+- **Ordered row locks over `SERIALIZABLE`.** Locking the balance rows in a fixed order serializes only
+  the accounts a transfer touches, with no retry storms. The cost is one hot account capping
+  throughput (about 510 transfers/s, measured) ([ADR-006](docs/adr/006-concurrency-safe-balances.md)).
+- **Idempotency in Postgres, not Redis.** Claiming the key in the same transaction as the postings
+  makes "exactly once" a database guarantee, at the cost of one extra row per transfer
+  ([ADR-007](docs/adr/007-idempotency.md)).
+- **Capability check remote, ownership local.** AccessCore decides _may this caller move money at
+  all_, and MiniLedger decides _is this their account_. That avoids a two-system commit on every
+  account open ([ADR-009](docs/adr/009-accesscore-integration.md)).
+
+Every decision, the alternatives considered, and what was deliberately left out are in
+[`docs/trade-offs.md`](docs/trade-offs.md) and the ADRs.
 
 ## Future Improvements
 
-Emits domain events for the EventBridge spine project; CQRS read models for reporting.
+The outbox relay (spine project #3, EventBridge) publishes the domain events MiniLedger already
+writes; CQRS read models for reporting follow (spine project #4).
 
 ## How to Run
 

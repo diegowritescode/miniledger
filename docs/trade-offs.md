@@ -26,14 +26,17 @@ most of these trades buy **provable correctness** at a deliberate, documented co
   FX will be modeled as balanced per-currency legs through a settlement account, not by summing
   across currencies. Out of scope until then (`numeric` becomes the natural upgrade if fractional
   minor units appear).
-- **Domain-event outbox → EventBridge.** The seam is designed for ([ADR-001](adr/001-architecture-style.md))
-  but not built; it lands with spine project #3 without reshaping the domain.
+- **Outbox relay → EventBridge.** Domain events are already written to a transactional outbox in
+  the same transaction as the postings ([ADR-010](adr/010-transactional-outbox.md)), so an event can
+  never disagree with the money. The relay that publishes them to a broker is deliberately not built
+  here; it is the job of spine project #3 (EventBridge) and needs no change to the domain.
 - **Cryptographic signing of postings.** The hash chain is tamper-**evident**, not
   non-repudiable; KMS/Vault-held signing keys are the additive upgrade
   ([ADR-008](adr/008-audit-hash-chain.md)), deferred to avoid key management this scale does not need.
 - **Full ReBAC ownership in AccessCore.** Account-owner tuples are kept local to avoid a two-system
   commit ([ADR-009](adr/009-accesscore-integration.md)); a later ring, not day one.
-- **LIVE public deployment, least-privilege DB role, metrics/tracing.** Documented hardening slices
-  — see [deployment.md](deployment.md).
+- **Distributed tracing.** Structured logs with correlation ids and Prometheus metrics ship today
+  ([ADR-012](adr/012-observability.md)); OpenTelemetry waits for a collector and a second hop worth
+  tracing (the EventBridge relay).
 
 See [`adr/`](adr/) for the full records.
