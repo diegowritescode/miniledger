@@ -92,5 +92,13 @@
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "^5.4.1"
+    },
+    "typed-rest-client": {
+      "qs": "^6.16.0"
+    }
   }
 }
