@@ -1,3 +1,5 @@
+import { headers as requestHeaders } from 'next/headers';
+
 export const ML_TOKEN_COOKIE = 'ml_token';
 export const ML_USER_COOKIE = 'ml_user';
 
@@ -24,8 +26,23 @@ interface CallOptions {
   headers?: Record<string, string>;
 }
 
+async function visitorHeaders(): Promise<Record<string, string>> {
+  const incoming = await requestHeaders();
+  const visitor: Record<string, string> = {};
+  const address = incoming.get('x-forwarded-for')?.split(',').at(-1)?.trim();
+  if (address) {
+    visitor['x-forwarded-for'] = address;
+  }
+  const agent = incoming.get('user-agent');
+  if (agent) {
+    visitor['user-agent'] = agent;
+  }
+  return visitor;
+}
+
 async function call(baseUrl: string, path: string, options: CallOptions): Promise<UpstreamResult> {
   const headers: Record<string, string> = {
+    ...(await visitorHeaders()),
     'content-type': 'application/json',
     ...options.headers,
   };

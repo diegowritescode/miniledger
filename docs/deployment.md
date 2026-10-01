@@ -113,12 +113,21 @@ the commit SHA after `CI` passes on `main`.
                       └────┬─────────────────────────┬──────────────────┘
                            │   internal (private)    │
                         postgres                     └──► api
-  api ──► https://auth.deviego.xyz  (AccessCore: JWKS + check, public contract)
+  api, web ──► accesscore-api:3000 on edge  (AccessCore: login, JWKS, check)
 ```
 
 Stacks share the `edge` network, where every service name is also a DNS name. Two stacks that
-both define `api` would make `api` resolve to either one, so internal calls always use the
-stack-unique alias on the private network (`miniledger-api`), never the bare service name.
+both define `api` would make `api` resolve to either one, so internal calls always use a
+stack-unique alias (`miniledger-api` on the private network, `accesscore-api` on `edge`), never the
+bare service name.
+
+**MiniLedger reaches AccessCore over `edge`, not through its public hostname.** A call to
+`https://auth.deviego.xyz` from a container hairpins through Traefik, which drops forwarded headers
+from untrusted sources and shows AccessCore the Docker gateway instead. Every dashboard login would
+then share one address, and so one per-IP login throttle and lockout counter for all visitors.
+Calling `http://accesscore-api:3000` directly lets the dashboard's backend-for-frontend forward the
+visitor's address and user agent, which AccessCore trusts from exactly one proxy hop. The JWT
+issuer is still the public URL: it is a claim to compare, not an address to call.
 
 **Prerequisites:** Docker Compose, a Traefik v3 on the host with an `le` certificate resolver and
 an external `edge` network it is attached to, DNS `A` records for both hostnames, and a running
@@ -136,16 +145,18 @@ On first boot Postgres creates the least-privilege `miniledger_app` role
 serves as `miniledger_app`. No AccessCore credential is needed: the PEP forwards the caller's own
 access token on each `check()`.
 
-| Variable (`deploy/.env`) | Example                        | Notes                                               |
-| ------------------------ | ------------------------------ | --------------------------------------------------- |
-| `MINILEDGER_IMAGE_TAG`   | _(commit SHA)_                 | Immutable image tag; rollback = previous SHA.       |
-| `API_HOST` / `WEB_HOST`  | `ledger.deviego.xyz` / `app.…` | Traefik routes and certificates.                    |
-| `ACCESSCORE_URL`         | `https://auth.deviego.xyz`     | Base URL, JWKS, and required `iss` all derive here. |
-| `POSTGRES_PASSWORD`      | _(secret)_                     | Owner role; runs migrations.                        |
-| `APP_DB_PASSWORD`        | _(secret)_                     | Runtime role `miniledger_app`.                      |
+| Variable (`deploy/.env`)  | Example                        | Notes                                                  |
+| ------------------------- | ------------------------------ | ------------------------------------------------------ |
+| `MINILEDGER_IMAGE_TAG`    | _(commit SHA)_                 | Immutable image tag; rollback = previous SHA.          |
+| `API_HOST` / `WEB_HOST`   | `ledger.deviego.xyz` / `app.…` | Traefik routes and certificates.                       |
+| `ACCESSCORE_URL`          | `https://auth.deviego.xyz`     | Required `iss` claim (AccessCore's public URL).        |
+| `ACCESSCORE_INTERNAL_URL` | `http://accesscore-api:3000`   | Optional; where the API and dashboard call AccessCore. |
+| `POSTGRES_PASSWORD`       | _(secret)_                     | Owner role; runs migrations.                           |
+| `APP_DB_PASSWORD`         | _(secret)_                     | Runtime role `miniledger_app`.                         |
 
 > `ACCESSCORE_URL` must equal the deployed AccessCore's `iss` claim, or offline verification fails
-> with 401. A protected call also requires the caller's subject to hold the matching `ledger.*`
+> with 401. `ACCESSCORE_INTERNAL_URL` defaults to the `accesscore-api` alias that the AccessCore stack
+> publishes on `edge`; set it to the public URL only when AccessCore runs on another host. A protected call also requires the caller's subject to hold the matching `ledger.*`
 > permission in AccessCore on `{type: "ledger", id: "miniledger"}` — the grant in
 > [`demo.md`](demo.md). `/metrics` is not routed publicly.
 

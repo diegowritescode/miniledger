@@ -1,6 +1,7 @@
 # ADR-014: Immutable container releases behind a shared edge proxy
 
-- **Status:** Accepted (2026-09-23)
+- **Status:** Accepted (2026-09-23). Amended 2026-10-01: decision 4 now routes AccessCore calls
+  over the shared `edge` network (see the amendment under it).
 - **Date:** 2026-09-23
 - Replace the Dokploy build-on-server deployment with images built once in CI, published to GHCR
   under the commit SHA, and run by a versioned Compose file behind a Traefik instance shared with
@@ -33,6 +34,16 @@ services or datastores.
 4. **AccessCore over its public contract.** The API reaches AccessCore at its public URL, exactly as
    any other consumer of the SDK would ([ADR-009](009-accesscore-integration.md)). The two stacks
    share no network.
+
+   _Amendment (2026-10-01):_ on a shared host, a container calling the public hostname hairpins
+   through Traefik, which discards forwarded headers from untrusted sources. AccessCore therefore
+   saw every dashboard login as coming from the Docker gateway, so all visitors shared one per-IP
+   login throttle and lockout counter. The API and dashboard now call AccessCore at
+   `http://accesscore-api:3000`, a stack-unique alias AccessCore publishes on `edge`, and the
+   dashboard forwards the visitor's address and user agent. The contract is unchanged (same
+   endpoints, same SDK, the issuer is still the public URL). Only the route is different, and
+   `ACCESSCORE_INTERNAL_URL` restores the public route when AccessCore runs elsewhere.
+
 5. **`/metrics` is not routed publicly**, and the dashboard reaches the API over the private network.
 6. **Least privilege from first boot.** A Postgres init script creates `miniledger_app`
    ([ADR-011](011-least-privilege-db-role.md)) on a fresh volume.
