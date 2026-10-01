@@ -19,3 +19,9 @@ miniledger-demo.txt
 # mutation testing (Stryker) — sandbox may contain a copied .env, never commit it
 .stryker-tmp/
 reports/mutation/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+**/playwright/.auth/

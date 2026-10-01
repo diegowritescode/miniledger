@@ -8,6 +8,7 @@ its published SDK.
 [![CI](https://github.com/diegowritescode/miniledger/actions/workflows/ci.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/ci.yml)
 [![Security](https://github.com/diegowritescode/miniledger/actions/workflows/security.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/security.yml)
 [![Release](https://github.com/diegowritescode/miniledger/actions/workflows/release.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/release.yml)
+[![Production smoke](https://github.com/diegowritescode/miniledger/actions/workflows/smoke.yml/badge.svg)](https://github.com/diegowritescode/miniledger/actions/workflows/smoke.yml)
 ![Coverage](https://img.shields.io/badge/coverage-99%25%20lines%20%28merged%29-brightgreen)
 ![Mutation score](https://img.shields.io/badge/mutation%20score-100%25%20ledger%20domain-brightgreen)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -114,8 +115,11 @@ runbook in [`docs/security.md`](docs/security.md)). Full model in [`docs/securit
 Unit / integration / E2E, with **property-based tests (fast-check)** of the ledger invariants and a
 real-Postgres concurrency test of the balance locks. A single **merged** coverage gate (nyc across
 all three suites) enforces **90% lines / 90% statements / 85% functions / 75% branches**; the latest
-run sits around **~99% lines, ~98% statements, 100% functions, ~86% branches**. See
-[`docs/testing-strategy.md`](docs/testing-strategy.md).
+run sits around **~99% lines, ~98% statements, 100% functions, ~86% branches**.
+
+The dashboard has a **Playwright** suite that runs in CI against **AccessCore's released image**:
+sign-in, statements, integrity, an idempotent transfer retry. Its read-only `@smoke` subset runs
+**hourly against the live instance**. See [`docs/testing-strategy.md`](docs/testing-strategy.md).
 
 ## Deployment
 
