@@ -39,9 +39,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MIGRATION_DATABASE_URL: postgres://miniledger:${POSTGRES_PASSWORD}@postgres:5432/miniledger
       DATABASE_URL: postgres://miniledger_app:${APP_DB_PASSWORD}@postgres:5432/miniledger
-      ACCESSCORE_BASE_URL: ${ACCESSCORE_URL:?set ACCESSCORE_URL in deploy/.env}
-      ACCESSCORE_JWKS_URL: ${ACCESSCORE_URL}/.well-known/jwks.json
-      ACCESSCORE_JWT_ISSUER: ${ACCESSCORE_URL}
+      ACCESSCORE_BASE_URL: ${ACCESSCORE_INTERNAL_URL:-http://accesscore-api:3000}
+      ACCESSCORE_JWKS_URL: ${ACCESSCORE_INTERNAL_URL:-http://accesscore-api:3000}/.well-known/jwks.json
+      ACCESSCORE_JWT_ISSUER: ${ACCESSCORE_URL:?set ACCESSCORE_URL in deploy/.env}
       ACCESSCORE_JWT_AUDIENCE: accesscore
     expose: ['3000']
     healthcheck:
@@ -77,7 +77,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      ACCESSCORE_API_URL: ${ACCESSCORE_URL}
+      ACCESSCORE_API_URL: ${ACCESSCORE_INTERNAL_URL:-http://accesscore-api:3000}
       MINILEDGER_API_URL: http://miniledger-api:3000
     expose: ['3002']
     mem_limit: 256m
