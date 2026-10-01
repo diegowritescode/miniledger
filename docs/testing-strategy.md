@@ -27,11 +27,33 @@ each have a test that would fail if the guarantee were lost.
     `SUM(postings)`.
 - **E2E (HTTP).** The account and transfer flows end to end: open accounts, deposit from `@world`,
   transfer, and the RFC 7807 rejections (insufficient funds → 422, unknown account → 404).
+- **Browser (Playwright, `web/e2e`).** The dashboard as a visitor uses it, through the real
+  backend-for-frontend, the real API and a **real AccessCore**:
+  - signing in through AccessCore, the anonymous redirect, unknown credentials, sign-out;
+  - the accounts list, a statement whose running balance ends at the account's balance, and the
+    integrity page (money conserved, every hash chain intact);
+  - a transfer between two of the owner's accounts that moves both balances, a retried transfer
+    that reuses its idempotency key and posts once, opening an account;
+  - the EN/ES toggle.
+
+## Browser journeys against the released AccessCore
+
+The `e2e` CI job does not stub the identity provider. It starts **AccessCore's published image**
+(`ghcr.io/diegowritescode/accesscore-api:latest`) beside its own Postgres and Redis, seeds it,
+signs in to learn the demo account's subject, and seeds MiniLedger for that owner. The suite is
+therefore a consumer-side contract test: if a new AccessCore release changes the login response,
+the JWKS, or the `check` contract the SDK relies on, MiniLedger's CI turns red on its next run. The
+suite signs in once (a Playwright setup project) and reuses the session.
+
+Journeys tagged `@smoke` are **read-only**, so they also run **hourly against the live dashboard**
+(`Production smoke` workflow), after probing the API's `/health`, `/ready` and `/docs` and checking
+that `/metrics` is not exposed.
 
 ## Tools
 
 Jest + ts-jest (unit/integration/e2e projects), Supertest for HTTP, **fast-check** for
-property-based tests, and a real Postgres for the integration/e2e suites.
+property-based tests, a real Postgres for the integration/e2e suites, and **Playwright** (Chromium)
+for the dashboard.
 
 ## Coverage
 

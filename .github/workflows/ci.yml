@@ -51,3 +51,81 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: miniledger
+          POSTGRES_PASSWORD: miniledger
+          POSTGRES_DB: miniledger
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U miniledger"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+      accesscore-postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: accesscore
+          POSTGRES_PASSWORD: accesscore
+          POSTGRES_DB: accesscore
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U accesscore"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+      accesscore-redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgres://miniledger:miniledger@localhost:5432/miniledger
+      ACCESSCORE_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - name: Start AccessCore from its released image
+        run: |
+          docker run -d --name accesscore --network host \
+            -e NODE_ENV=development -e PORT=3001 \
+            -e DATABASE_URL=postgres://accesscore:accesscore@localhost:5433/accesscore \
+            -e REDIS_URL=redis://localhost:6379 \
+            -e SIGNER_DRIVER=software \
+            -e JWT_ISSUER="$ACCESSCORE_URL" \
+            -e DEMO_ACCOUNT_EMAIL=demo@accesscore.dev \
+            ghcr.io/diegowritescode/accesscore-api:latest
+          timeout 120 sh -c 'until curl -sf "$ACCESSCORE_URL/ready" >/dev/null; do sleep 2; done'
+          docker exec accesscore node dist/seed.js
+      - run: npm ci
+      - run: npm run build
+      - run: npm run db:migrate
+      - name: Seed the demo owner's ledger
+        run: |
+          token=$(curl -fsS -X POST "$ACCESSCORE_URL/auth/login" -H 'content-type: application/json' \
+            -d '{"email":"demo@accesscore.dev","password":"correct horse battery staple"}' | jq -r .access_token)
+          subject=$(node -e "console.log(JSON.parse(Buffer.from(process.argv[1].split('.')[1], 'base64url')).sub)" "$token")
+          DEMO_OWNER_SUBJECT="$subject" node dist/seed.js
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run test:e2e
+        working-directory: web
+      - if: failure()
+        run: docker logs accesscore --tail 200
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7

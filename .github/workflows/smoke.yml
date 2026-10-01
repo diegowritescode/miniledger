@@ -1,0 +1,55 @@
+name: Production smoke
+
+on:
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      API: https://ledger.deviego.xyz
+      WEB: https://app.ledger.deviego.xyz
+    steps:
+      - name: API is live and ready
+        run: |
+          curl -fsS --retry 3 --retry-all-errors "$API/health"
+          curl -fsS --retry 3 --retry-all-errors "$API/ready"
+      - name: OpenAPI docs are served
+        run: curl -fsS --retry 3 --retry-all-errors -o /dev/null "$API/docs"
+      - name: Metrics stay private
+        run: |
+          status=$(curl -s -o /dev/null -w '%{http_code}' "$API/metrics")
+          test "$status" = 404 || { echo "/metrics answered $status publicly"; exit 1; }
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Dashboard journeys against production
+        run: npx playwright test --grep @smoke
+        working-directory: web
+        env:
+          E2E_BASE_URL: ${{ env.WEB }}
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-report
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
